@@ -1,0 +1,21 @@
+Loading spot + catalog ...
+Running CPR +50 config, NO IV filter (records every day's IV) ...
+
+filter                     days       net Rs     PF      t
+----------------------------------------------------------
+baseline (no filter)        968   -1,424,953   0.84  -2.34
+FIXED  IV<=0.12             280      744,824   1.43   2.69
+PCTILE bottom 20% (L252)    259      197,768   1.11   0.75
+PCTILE bottom 30% (L252)    352      138,888   1.05   0.44
+PCTILE bottom 40% (L252)    444     -129,656   0.96  -0.35
+
+By-year (k = thousands):
+   FIXED 0.12          : 2020:  -27k  2021:    4k  2022:  100k  2023:  124k  2024:   59k  2025:  381k  2026:  104k
+   PCTILE bottom 20%     : 2020:  -24k  2021:  -72k  2022:  -36k  2023:    3k  2024:   27k  2025:  299k
+   PCTILE bottom 30%     : 2020: -100k  2021: -181k  2022:  -79k  2023:   34k  2024:  -13k  2025:  478k
+   PCTILE bottom 40%     : 2020: -245k  2021: -236k  2022:  -42k  2023:    1k  2024:  -54k  2025:  446k
+
+Day-selection overlap vs FIXED 0.12:
+   bottom 20%: fixed=280 pctile=259 shared=171 jaccard=0.46
+   bottom 30%: fixed=280 pctile=352 shared=193 jaccard=0.44
+   bottom 40%: fixed=280 pctile=444 shared=212 jaccard=0.41

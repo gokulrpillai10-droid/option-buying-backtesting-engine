@@ -1,0 +1,23 @@
+Loading spot + catalog ...
+
+=== EMA 9/21  +/-5pt premium  slip 0.25%   3724 trades ===
+net Rs-495,836   PF 0.49   win 45%   t -18.45   avg net/trade Rs-133
+   2020:  627 trades  net Rs    -94,074  PF 0.45
+   2021:  589 trades  net Rs    -59,054  PF 0.59
+   2022:  634 trades  net Rs    -95,536  PF 0.44
+   2023:  592 trades  net Rs    -69,720  PF 0.53
+   2024:  592 trades  net Rs    -87,058  PF 0.46
+   2025:  598 trades  net Rs    -78,338  PF 0.50
+   2026:   92 trades  net Rs    -12,057  PF 0.44
+   exits: {'stop': 1997, 'target': 1623, 'eod': 104}
+
+=== EMA 9/21  +/-5pt premium  slip 0.50%   3737 trades ===
+net Rs-708,039   PF 0.36   win 41%   t -26.46   avg net/trade Rs-189
+   2020:  632 trades  net Rs   -125,266  PF 0.34
+   2021:  593 trades  net Rs    -91,167  PF 0.44
+   2022:  635 trades  net Rs   -137,685  PF 0.30
+   2023:  593 trades  net Rs    -97,143  PF 0.41
+   2024:  592 trades  net Rs   -123,052  PF 0.32
+   2025:  600 trades  net Rs   -116,645  PF 0.35
+   2026:   92 trades  net Rs    -17,080  PF 0.31
+   exits: {'stop': 2136, 'target': 1497, 'eod': 104}

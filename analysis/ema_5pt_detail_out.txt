@@ -1,0 +1,44 @@
+Loading spot + catalog ...
+
+==============================================================================
+EMA 9/21 crossover  ·  +/-5 premium-point bracket  ·  1 lot  ·  slip 0.25%
+entries 09:40-14:55 (EMAs warm from 09:15)  ·  square-off 14:58  ·  2020-2026
+==============================================================================
+
+YEAR-BY-YEAR
+Year   Trades       Net Rs   Win%    PF   AvgWin  AvgLoss   W/L  Exp/tr
+-----------------------------------------------------------------------
+2020      627      -94,074    43%  0.45      280     -480  0.58    -150
+2021      589      -59,054    48%  0.59      297     -465  0.64    -100
+2022      634      -95,536    44%  0.44      275     -483  0.57    -151
+2023      592      -69,720    46%  0.53      288     -458  0.63    -118
+2024      592      -87,058    44%  0.46      281     -480  0.59    -147
+2025      598      -78,338    45%  0.50      285     -476  0.60    -131
+2026       92      -12,057    43%  0.44      237     -414  0.57    -131
+-----------------------------------------------------------------------
+ALL      3724     -495,836    45%  0.49      284     -473  0.60    -133
+
+PORTFOLIO QUANT METRICS
+  Net P&L                 Rs    -495,836
+  Trades                          3,724   (1370 trading days)
+  Profit factor                    0.49
+  Win rate                        44.9%
+  Expectancy / trade      Rs        -133
+  Avg win / Avg loss      Rs   284 / Rs-473   (W/L 0.60)
+  t-statistic                    -20.79
+  Sharpe (daily, ann.)            -8.19
+  Sortino (daily, ann.)          -10.69
+  Calmar                          -0.16
+  Max drawdown            Rs    -497,592
+  Max consecutive losses             11
+  Best / Worst trade      Rs 4,209 / Rs-2,364
+  Net excl. top-10 wins   Rs    -509,719
+
+BY SIDE
+  CALL   1884 trades  net Rs   -266,199  win 44%  PF 0.47
+  PUT    1840 trades  net Rs   -229,637  win 45%  PF 0.51
+
+BY EXIT REASON
+  eod        104 trades  net Rs     -3,197  avg Rs   -31  (3%)
+  stop      1997 trades  net Rs   -943,929  avg Rs  -473  (54%)
+  target    1623 trades  net Rs    451,290  avg Rs   278  (44%)

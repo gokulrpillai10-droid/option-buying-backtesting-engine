@@ -1,0 +1,53 @@
+# ORB Call Breakout — intraday NIFTY option-buying strategy (candidate v1)
+#
+# Discovered via analysis/orb_study.py over 36 expiries (2020-2026, 418 sample
+# trades). This is a CANDIDATE pending rigorous validation through
+# engine/execution (full data, golden tests, real F&O costs). Numbers below are
+# from the approximate study (1% slippage only, brokerage/taxes NOT yet applied).
+#
+# Edge rationale:
+#   - CALL-only: NIFTY has a structural upward drift; long puts bleed intraday.
+#   - DTE >= 3: the 0-2 DTE theta cliff destroyed returns (PF 0.55); >=3 DTE works.
+#   - Opening-range width >= 0.3%: wide morning range = volatility expansion day,
+#     breakouts follow through (PF 1.94 vs ~1.0 for tight days).
+#
+# Study stats for this exact rule set: n=45, win 47%, avg +8.7%/trade, PF 1.94.
+
+name: orb_call_breakout
+side: CALL                         # options BUYING, calls only (v1)
+
+instrument:
+  underlying: NIFTY50
+  expiry_selection: nearest_with_min_dte   # roll past the near week if too close
+  min_dte_days: 3                          # skip the theta cliff
+
+session:
+  opening_range:  ["09:15", "09:29"]       # defines the breakout reference
+  entry_window:   ["09:30", "13:00"]       # need time for the move to run
+  square_off:     "15:15"                  # hard intraday flat (no overnight)
+
+entry:
+  all:                                     # AND-combined
+    - opening_range_breakout:              # price: break above OR high
+        direction: up
+        buffer_pct: 0.05                   # confirm 0.05% beyond the range
+    - range_width_filter:                  # volatility: only wide-range days
+        metric: opening_range_width_pct
+        min: 0.30
+
+strike_selection:
+  method: ATM                              # nearest traded strike to Forward
+  require_traded_strike: true
+
+liquidity_gate:
+  min_volume: 200
+  min_oi: 25000
+  require_traded_strike: true
+
+exit:
+  stop_loss: { type: percent, value: 30 }  # initial hard stop
+  trailing:  { type: percent, value: 25 }  # trail 25% off the running peak
+  square_off: "15:15"                       # unconditional EOD exit
+
+sizing:
+  lots: 9

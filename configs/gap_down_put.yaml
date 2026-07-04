@@ -1,0 +1,57 @@
+# Gap-Down Continuation Put — intraday NIFTY downside option-buying (candidate v1)
+#
+# Answers "what do big down-days have in common?": they GAP DOWN (78%) and
+# CONTINUE (94% close red from open, 73% close in bottom 25% of range). The edge
+# is a regime gate (gap-down) + an early breakdown trigger, with the user's
+# asymmetric capture scheme (book 25 / target 50 / trail the rest).
+#
+# Discovered via analysis/gap_down_continuation.py on the FULL 2020-2026 sample
+# (no look-ahead, all gap-down days). INDEX-point sim, NO costs, idealised fills:
+#   347 trades, PF ~1.33-1.36, +25 hit 71%, +50 hit 57%, ~+6.7 pts/trade.
+# Long puts may do even better than the linear index sim because IV often expands
+# on gap-down panic days (vega tailwind) -- to be confirmed by the engine.
+
+name: gap_down_continuation_put
+side: PUT                              # downside; only valid under the gap gate below
+
+instrument:
+  underlying: NIFTY50
+  expiry_selection: nearest_with_min_dte
+  min_dte_days: 3                      # same theta-cliff avoidance as the call strat
+
+session:
+  opening_range: ["09:15", "09:29"]
+  entry_window:  ["09:30", "11:30"]    # gap-down moves are a morning phenomenon
+  square_off:    "15:15"
+
+entry:
+  all:                                 # AND-combined
+    - gap_filter:                      # REGIME GATE: don't fight the drift
+        metric: open_minus_prev_close
+        max_points: -20                # require a gap-down of >=20 pts
+    - opening_range_breakdown:         # trigger: break the OR low
+        direction: down
+        buffer_points: 2
+  # optional quality filter from the study: skip the "gap-fill" dead zone
+  prefer_gap_buckets: ["20-50", ">100"]   # gap 50-100 is weak (PF ~1.0)
+
+strike_selection:
+  method: ATM
+  require_traded_strike: true
+
+liquidity_gate:
+  min_volume: 200
+  min_oi: 25000
+  require_traded_strike: true
+
+# Capture scheme expressed on the UNDERLYING move (engine maps to option exits):
+exit:
+  underlying_stop:   { points: 35 }    # 30-40 pt adverse stop is optimal
+  scale_out:                           # the 25/50/trail plan
+    - { at_points: 25, fraction: 0.5 } # book half at +25
+    - { at_points: 50, fraction: 0.5, then: trail }  # rest targets 50, then trails
+  trail: { points: 20 }
+  square_off: "15:15"
+
+sizing:
+  lots: 9

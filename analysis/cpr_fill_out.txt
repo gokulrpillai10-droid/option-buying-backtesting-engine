@@ -1,0 +1,44 @@
+Loading spot + catalog ...
+Running DEPLOYED CPR config (max_iv=0.12), auditing every entry ...
+
+=== DEEP-ITM FILL AUDIT  (286 entry signals; trades realised in engine = 384 legs' positions) ===
+
+1. TRADEABILITY
+   on a traded strike (is_traded)    :  95.5%   (273/286)
+   strike missing from chain         : 6
+   not-traded (engine would reject)  : 13
+
+2. MINUTE-LEVEL LIQUIDITY (signal-bar volume vs our 6-lot order)
+   required qty / order (6 lots)     : 390-450
+   median signal-minute volume       : 23,238
+   median volume / order size        : 51.6x
+   entries with vol >=  1x order    :  90.9%
+   entries with vol >=  5x order    :  80.4%
+   entries with vol >= 10x order    :  72.4%
+   entries with vol >= 50x order    :  50.3%
+   entries with vol <  1x order      : 26  (one bar can't fully absorb)
+
+3. OPEN-INTEREST DEPTH
+   median OI at strike               : 434,838
+   our order as % of OI (median)     : 0.103%
+
+4. DELTA (is the strike really deep-ITM ~0.8?)
+   median |delta|                    : 0.69
+   delta in [0.70, 0.95]             : 44.4%
+
+5. CAPITAL & SLIPPAGE per trade
+   median premium (points)           : 204.0
+   median capital deployed (Rs)      : 90,934
+   median modeled slip cost (Rs)     : 227
+   total modeled slip cost (Rs)      : 65,533
+
+6. WORST 8 ENTRIES BY VOLUME/ORDER RATIO
+      date side  strike  volume  req_qty  vol_mult     oi     delta
+2020-01-01 CALL   12050       0      450       0.0      0  0.814375
+2020-01-07 CALL   11950       0      450       0.0   6375  0.746737
+2020-01-14 CALL   12150       0      450       0.0      0  0.752183
+2020-01-15  PUT   12450       0      450       0.0      0 -0.718794
+2020-01-22 CALL   12050       0      450       0.0  18375  0.777851
+2021-07-07  PUT   15950       0      450       0.0  18300 -0.661968
+2025-07-23 CALL   24950       0      450       0.0 164550  0.711894
+2025-12-24  PUT   26300       0      450       0.0      0       NaN

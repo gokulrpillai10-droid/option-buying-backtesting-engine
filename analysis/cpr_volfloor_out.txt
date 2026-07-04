@@ -1,0 +1,28 @@
+Loading spot + catalog ...
+Running DEPLOYED CPR config (max_iv=0.12) ...
+
+=== MIN-VOLUME FLOOR SWEEP  (baseline = 280 trade-days, Rs744,824) ===
+floor                   days dropped       net Rs  % kept    PF     t
+---------------------------------------------------------------------
+baseline (no floor)      280       0      744,824    100%  1.43  2.69
+volume >=  1x order      260      20      732,407     98%  1.46  2.74
+volume >=  5x order      230      50      731,908     98%  1.51  2.85
+volume >= 10x order      207      73      868,525    117%  1.70  3.53
+volume >= 20x order      187      93      834,083    112%  1.76  3.55
+volume >= 50x order      144     136      783,026    105%  1.92  3.72
+
+P&L of trades DROPPED at each floor (negative = floor removes losers = good):
+   <  1x: drops  20 days, their net = Rs     12,416
+   <  5x: drops  50 days, their net = Rs     12,916
+   < 10x: drops  73 days, their net = Rs   -123,701
+   < 20x: drops  93 days, their net = Rs    -89,259
+   < 50x: drops 136 days, their net = Rs    -38,203
+
+By-year: baseline vs volume>=10x
+   2020: baseline Rs    -27,053   >=10x Rs     36,030   (kept 4/12)
+   2021: baseline Rs      3,683   >=10x Rs     18,789   (kept 8/19)
+   2022: baseline Rs     99,664   >=10x Rs     99,664   (kept 7/7)
+   2023: baseline Rs    123,830   >=10x Rs    144,597   (kept 77/105)
+   2024: baseline Rs     59,088   >=10x Rs    133,603   (kept 21/37)
+   2025: baseline Rs    381,197   >=10x Rs    347,753   (kept 69/78)
+   2026: baseline Rs    104,415   >=10x Rs     88,089   (kept 21/22)

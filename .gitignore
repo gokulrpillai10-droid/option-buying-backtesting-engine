@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+data_equity/
+.DS_Store

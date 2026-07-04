@@ -1,0 +1,43 @@
+Loading spot + catalog ...
+
+================================================================================
+EMA 9/21  ·  100-pt ITM  ·  stop -15 / target +35 premium pts  ·  6 lots  ·  slip 0.25%
+entries 09:40-14:55 (EMA warm 09:15)  ·  square 14:58  ·  2020-2026
+================================================================================
+
+YEAR-BY-YEAR
+Year   Trades        Net Rs   Win%    PF    AvgWin   AvgLoss   Exp/tr
+---------------------------------------------------------------------
+2020      465      -553,501    32%  0.76    12,041    -7,368   -1,190
+2021      432        15,031    36%  1.01    12,823    -7,049       35
+2022      513      -358,765    31%  0.86    13,301    -7,103     -699
+2023      433      -201,158    33%  0.90    12,217    -6,783     -465
+2024      487      -314,525    31%  0.86    13,165    -6,853     -646
+2025      498      -388,002    32%  0.83    12,023    -6,895     -779
+2026       82       -17,950    35%  0.95    10,982    -6,348     -219
+---------------------------------------------------------------------
+ALL      2910    -1,818,869    33%  0.87    12,552    -6,992     -625
+
+PORTFOLIO QUANT METRICS (6 lots)
+  Net P&L                 Rs   -1,818,869
+  Trades / days             2,910 / 1370
+  Profit factor                    0.87
+  Win rate                        32.6%   (breakeven needs 30% at 35:15)
+  Expectancy / trade      Rs        -625
+  Avg win / Avg loss      Rs12,552 / Rs-6,992   (W/L 1.80)
+  t-statistic                     -3.46
+  Sharpe (daily, ann.)            -1.49
+  Sortino (daily, ann.)           -2.72
+  Max drawdown            Rs   -1,899,739
+  Max consec. losses                 17
+  Net excl. top-10 wins   Rs   -2,059,438
+  Avg entry premium       Rs        212.0   (qty/trade 448)
+
+BY SIDE
+  CALL   1443  net Rs    -722,194  win 34%  PF 0.89
+  PUT    1467  net Rs  -1,096,675  win 32%  PF 0.84
+
+BY EXIT REASON
+  eod        469  net Rs     910,453  avg Rs  1,941  (16%)
+  stop      1772  net Rs -12,928,099  avg Rs -7,296  (61%)
+  target     669  net Rs  10,198,776  avg Rs 15,245  (23%)

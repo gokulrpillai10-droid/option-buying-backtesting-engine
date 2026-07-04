@@ -1,0 +1,5 @@
+Loading spot + catalog ...
+no floor               trade-days  280   net Rs    744,824   PF 1.43   t 9.17
+min_volume_mult=10     trade-days  207   net Rs    868,525   PF 1.70   t 9.70
+
+EXPECTED (post-hoc cpr_volfloor.py): no floor=280d/+744,824 ; >=10x=207d/+868,525

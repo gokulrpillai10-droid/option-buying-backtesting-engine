@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CPR Breakout — Pilot Sizing Report (6 vs 9 lots)</title>
+<style>
+  :root{
+    --bg:#0f1115; --card:#171a21; --line:#272b35; --ink:#e8eaed; --muted:#9aa3b2;
+    --pos:#34d399; --neg:#f87171; --accent:#60a5fa; --accent2:#a78bfa; --warn:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1040px;margin:0 auto;padding:40px 24px 80px}
+  h1{font-size:30px;margin:0 0 4px;letter-spacing:-.02em}
+  .sub{color:var(--muted);font-size:15px;margin-bottom:28px}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);
+    margin:38px 0 14px;font-weight:600}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-bottom:16px}
+  .meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 26px}
+  .meta div{font-size:13.5px;color:var(--muted)}
+  .meta b{color:var(--ink);font-weight:600}
+  table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+  th,td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--line);font-size:14px}
+  th:first-child,td:first-child{text-align:left}
+  thead th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--line)}
+  tbody tr:hover{background:#1d212a}
+  .pos{color:var(--pos)} .neg{color:var(--neg)} .mut{color:var(--muted)}
+  .cmp{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:0}
+  .big{font-size:26px;font-weight:700;letter-spacing:-.01em}
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600}
+  .pill.six{background:rgba(96,165,250,.15);color:var(--accent)}
+  .pill.nine{background:rgba(167,139,250,.15);color:var(--accent2)}
+  .win{background:rgba(52,211,153,.12);color:var(--pos);border:1px solid rgba(52,211,153,.3);
+    border-radius:8px;padding:3px 8px;font-size:12px;font-weight:600}
+  .callout{border-left:3px solid var(--accent);background:rgba(96,165,250,.07);
+    border-radius:0 10px 10px 0;padding:16px 20px;margin:8px 0}
+  .callout.warn{border-color:var(--warn);background:rgba(251,191,36,.07)}
+  .callout h3{margin:0 0 8px;font-size:15px}
+  .callout p,.callout li{color:#cdd3dd;font-size:14px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:720px){.two{grid-template-columns:1fr}}
+  .foot{color:var(--muted);font-size:12.5px;margin-top:30px;border-top:1px solid var(--line);padding-top:16px}
+  .bar{height:7px;border-radius:4px;background:#272b35;overflow:hidden;margin-top:5px}
+  .bar > span{display:block;height:100%}
+  caption{caption-side:top;text-align:left;color:var(--muted);font-size:12px;padding-bottom:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>CPR Breakout — Pilot Sizing Report</h1>
+  <div class="sub">Deep-ITM intraday option-buying on NIFTY · 6 lots vs 9 lots · Capital ₹5,00,000 · Backtest Jan 2020 – Feb 2026 (6.1 years)</div>
+
+  <div class="card">
+    <div class="meta">
+      <div>Strategy <b>CPR cross, deep-ITM ~150pt</b></div>
+      <div>Scale-out <b>+50 book ⅔ / trail ⅓ by 12</b></div>
+      <div>Stop <b>far CPR-edge close</b></div>
+      <div>Regime filter <b>day-open ATM IV ≤ 0.12</b></div>
+      <div>Liquidity gate <b>signal-vol ≥ 10× order</b></div>
+      <div>Slippage <b>0.25% / side</b></div>
+      <div>Costs <b>full India F&amp;O model</b></div>
+      <div>Lot size <b>75 → 2025, 65 from 2026 (date-keyed)</b></div>
+    </div>
+  </div>
+
+  <h2>Headline — 6 vs 9 lots</h2>
+  <div class="card">
+    <table>
+      <thead><tr><th>Metric</th><th>6 lots</th><th>9 lots</th></tr></thead>
+      <tbody>
+        <tr><td>Trade-days</td><td>207</td><td>194</td></tr>
+        <tr><td>Net total</td><td class="pos">+₹8,68,525</td><td class="pos">+₹13,05,287</td></tr>
+        <tr><td>Annualized</td><td class="pos">+₹1,41,305</td><td class="pos">+₹2,12,363</td></tr>
+        <tr><td>Return on ₹5L / yr</td><td><b>28.3%</b></td><td><b>42.5%</b></td></tr>
+        <tr><td>Max drawdown</td><td class="neg">−₹96,032 <span class="mut">(19.2%)</span></td><td class="neg">−₹1,69,953 <span class="mut">(34.0%)</span></td></tr>
+        <tr><td>Return ÷ max DD</td><td><span class="win">1.47 ✓</span></td><td>1.25</td></tr>
+        <tr><td>Longest winning streak</td><td>7 days</td><td>7 days</td></tr>
+        <tr><td>Longest losing streak</td><td>6 days</td><td>8 days</td></tr>
+        <tr><td>Worst single day</td><td class="neg">−₹32,090</td><td class="neg">−₹48,111</td></tr>
+        <tr><td>Best single day</td><td class="pos">+₹29,176</td><td class="pos">+₹43,811</td></tr>
+        <tr><td>Median capital / trade</td><td>₹88,601</td><td>₹1,28,723</td></tr>
+        <tr><td>Max single position</td><td>₹1,58,796 <span class="mut">(32% of ₹5L)</span></td><td>₹2,38,194 <span class="mut">(48%)</span></td></tr>
+        <tr><td>Profit ex-2025 (drop-2025)</td><td class="pos">+₹5,20,771</td><td class="pos">+₹7,73,183</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Year-by-year</h2>
+  <div class="two">
+    <div class="card">
+      <table>
+        <caption><span class="pill six">6 LOTS</span></caption>
+        <thead><tr><th>Year</th><th>Days</th><th>Net</th><th>%5L</th><th>Max DD</th><th>Win%</th></tr></thead>
+        <tbody>
+          <tr><td>2020</td><td>4</td><td class="pos">+36,030</td><td>7%</td><td class="mut">0</td><td>100%</td></tr>
+          <tr><td>2021</td><td>8</td><td class="pos">+18,789</td><td>4%</td><td class="neg">−29,070</td><td>50%</td></tr>
+          <tr><td>2022</td><td>7</td><td class="pos">+99,664</td><td>20%</td><td class="neg">−18,572</td><td>86%</td></tr>
+          <tr><td>2023</td><td>77</td><td class="pos">+144,597</td><td>29%</td><td class="neg">−96,032</td><td>43%</td></tr>
+          <tr><td>2024</td><td>21</td><td class="pos">+133,603</td><td>27%</td><td class="neg">−55,034</td><td>62%</td></tr>
+          <tr><td>2025</td><td>69</td><td class="pos">+347,753</td><td>70%</td><td class="neg">−67,432</td><td>54%</td></tr>
+          <tr><td>2026</td><td>21</td><td class="pos">+88,089</td><td>18%</td><td class="neg">−74,724</td><td>52%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <table>
+        <caption><span class="pill nine">9 LOTS</span></caption>
+        <thead><tr><th>Year</th><th>Days</th><th>Net</th><th>%5L</th><th>Max DD</th><th>Win%</th></tr></thead>
+        <tbody>
+          <tr><td>2020</td><td>4</td><td class="pos">+54,163</td><td>11%</td><td class="mut">0</td><td>100%</td></tr>
+          <tr><td>2021</td><td>6</td><td class="pos">+18,727</td><td>4%</td><td class="neg">−25,923</td><td>50%</td></tr>
+          <tr><td>2022</td><td>7</td><td class="pos">+149,779</td><td>30%</td><td class="neg">−27,835</td><td>86%</td></tr>
+          <tr><td>2023</td><td>70</td><td class="pos">+244,790</td><td>49%</td><td class="neg">−169,953</td><td>44%</td></tr>
+          <tr><td>2024</td><td>18</td><td class="pos">+172,836</td><td>35%</td><td class="neg">−46,301</td><td>61%</td></tr>
+          <tr><td>2025</td><td>68</td><td class="pos">+532,103</td><td>106%</td><td class="neg">−92,893</td><td>56%</td></tr>
+          <tr><td>2026</td><td>21</td><td class="pos">+132,888</td><td>27%</td><td class="neg">−111,944</td><td>52%</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h2>Return vs drawdown (% of ₹5L)</h2>
+  <div class="card">
+    <div style="display:grid;grid-template-columns:90px 1fr;gap:12px 16px;align-items:center">
+      <div><span class="pill six">6 LOTS</span></div>
+      <div>
+        <div class="mut" style="font-size:12px">Annual return 28.3% &nbsp;·&nbsp; Max drawdown 19.2%</div>
+        <div class="bar"><span style="width:28.3%;background:var(--pos)"></span></div>
+        <div class="bar"><span style="width:19.2%;background:var(--neg)"></span></div>
+      </div>
+      <div><span class="pill nine">9 LOTS</span></div>
+      <div>
+        <div class="mut" style="font-size:12px">Annual return 42.5% &nbsp;·&nbsp; Max drawdown 34.0%</div>
+        <div class="bar"><span style="width:42.5%;background:var(--pos)"></span></div>
+        <div class="bar"><span style="width:34%;background:var(--neg)"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Verdict</h2>
+  <div class="callout">
+    <h3>6 lots is the better risk-adjusted fit for ₹5L</h3>
+    <ul>
+      <li><b>More return per unit of pain:</b> return-to-drawdown 1.47 vs 1.25. Going to 9 lots adds ~50% more return but ~77% more drawdown.</li>
+      <li><b>Survivable drawdown:</b> −19% (6 lots) is a recoverable dip; −34% (9 lots) is the zone where discipline usually breaks. Losing streak 6 vs 8 days.</li>
+      <li><b>Capital headroom:</b> 6 lots peaks at 32% of the account in one position; 9 lots hits 48% — nearly half on a single deep-ITM trade.</li>
+    </ul>
+    <p style="margin-bottom:0"><b>Recommended pilot size: 6 lots.</b> ~28%/yr at ~19% max drawdown on ₹5L is strong <i>and</i> holdable. Scale toward 9 only after living through a real drawdown and confirming live fills match the backtest.</p>
+  </div>
+
+  <div class="callout warn">
+    <h3>Caveats — read before sizing</h3>
+    <ul style="margin-bottom:0">
+      <li><b>Lighter live:</b> 2020–2025 figures use the old 75 lot; at today's 65 lot, live returns <i>and</i> drawdowns run ~13% lighter than shown (6 lots ≈ ~25%/yr, ~₹85k max DD).</li>
+      <li><b>Lumpy edge:</b> 2025 ≈ half the profit; the strategy sits flat in high-vol regimes by design — expect long quiet stretches.</li>
+      <li><b>Low frequency:</b> ~33–34 trades/yr — statistical power and recovery from drawdown both accrue slowly.</li>
+      <li><b>Validation basis:</b> walk-forward + percentile-falsification + fill audit + volume floor all passed; engine reconciled 582/582 vs the reference strategy. Still a small-pilot candidate, not bet-the-account.</li>
+    </ul>
+  </div>
+
+  <div class="foot">
+    CPR Breakout · realistic deployable config (<code>CPRBreakout()</code> defaults + <code>Knobs(fill_price="open", slippage_pct=0.0025, min_volume_mult=10)</code>) ·
+    Generated from <code>analysis/cpr_6lot.py</code> &amp; <code>analysis/cpr_9lot.py</code> on the validated backtest engine.
+    All figures are backtested, net of slippage and full F&amp;O costs. Past performance does not guarantee future results.
+  </div>
+
+</div>
+</body>
+</html>

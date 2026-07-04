@@ -1,0 +1,47 @@
+Loading spot + catalog ...
+
+=== ORB regime  BASELINE (no gate)   slip 0.25%   1468 trades ===
+net Rs-232,545   PF 0.84   win 45%   t -2.44
+   2020:  240 trades  net Rs    -36,618  PF 0.84
+   2021:  245 trades  net Rs    -26,652  PF 0.89
+   2022:  242 trades  net Rs    -27,687  PF 0.87
+   2023:  235 trades  net Rs    -72,358  PF 0.70
+   2024:  236 trades  net Rs    -23,401  PF 0.90
+   2025:  232 trades  net Rs    -34,582  PF 0.84
+   2026:   38 trades  net Rs    -11,246  PF 0.76
+
+=== ORB regime  min_iv >= 0.12   slip 0.25%   1051 trades ===
+net Rs-186,990   PF 0.82   win 46%   t -2.36
+   2020:  223 trades  net Rs    -31,693  PF 0.85
+   2021:  216 trades  net Rs    -19,827  PF 0.91
+   2022:  229 trades  net Rs    -42,645  PF 0.80
+   2023:   78 trades  net Rs     -7,439  PF 0.90
+   2024:  184 trades  net Rs    -37,674  PF 0.81
+   2025:  121 trades  net Rs    -47,713  PF 0.63
+
+=== ORB regime  min_iv >= 0.15   slip 0.25%   708 trades ===
+net Rs-116,720   PF 0.83   win 46%   t -1.72
+   2020:  211 trades  net Rs    -36,148  PF 0.83
+   2021:  157 trades  net Rs     11,834  PF 1.09
+   2022:  188 trades  net Rs    -26,754  PF 0.84
+   2023:   17 trades  net Rs    -20,238  PF 0.30
+   2024:   75 trades  net Rs     -5,219  PF 0.93
+   2025:   60 trades  net Rs    -40,195  PF 0.49
+
+=== ORB regime  min_iv >= 0.18   slip 0.25%   435 trades ===
+net Rs-98,205   PF 0.78   win 46%   t -1.95
+   2020:  175 trades  net Rs    -27,195  PF 0.84
+   2021:   90 trades  net Rs      4,074  PF 1.04
+   2022:  126 trades  net Rs    -44,497  PF 0.66
+   2023:    5 trades  net Rs     -8,834  PF 0.27
+   2024:   23 trades  net Rs     -8,568  PF 0.67
+   2025:   16 trades  net Rs    -13,186  PF 0.27
+
+=== ORB regime  min_iv >= 0.20   slip 0.25%   313 trades ===
+net Rs-59,924   PF 0.81   win 48%   t -1.36
+   2020:  139 trades  net Rs    -28,762  PF 0.80
+   2021:   63 trades  net Rs     12,798  PF 1.21
+   2022:   88 trades  net Rs    -36,591  PF 0.61
+   2023:    2 trades  net Rs     -6,443  PF 0.00
+   2024:   11 trades  net Rs      6,927  PF 3.67
+   2025:   10 trades  net Rs     -7,855  PF 0.28
