@@ -11,6 +11,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7"]
+equity-fetch = ["kiteconnect>=5", "python-dotenv>=1"]   # live Kite fetch only; backtest/tests don't need them
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
