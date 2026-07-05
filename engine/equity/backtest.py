@@ -91,8 +91,12 @@ class EquityBacktest:
             if pos is None:
                 orders = strategy.on_bar(ctx)
                 if orders:
+                    if len(orders) > 1:
+                        raise ValueError(
+                            f"equity v1 takes one order per bar (got {len(orders)})")
                     o = orders[0]
                     fb = self._spot.bar_at(b + self._tf)
+                    # signal on the day's last bar has no next bar -> dropped (no fill)
                     if fb is not None:
                         fill = self._entry_fill(fb.open, o.direction)
                         qty = int(o.capital // fill)
@@ -109,6 +113,8 @@ class EquityBacktest:
                                      f"(got fraction={ex.fraction})")
                 if ex.kind == "market":
                     fb = self._spot.bar_at(b + self._tf)
+                    # no next bar on the day's last bar -> exit dropped here; falls
+                    # through to the EOD square-off below
                     if fb is not None:
                         t = pos.close(self._exit_fill(fb.open, pos.direction),
                                       self._costs, reason=ex.reason)

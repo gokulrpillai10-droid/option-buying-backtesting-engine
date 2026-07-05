@@ -99,6 +99,21 @@ def test_retry_exhausted_raises(tmp_path):
                      max_retries=3, today=date(2024, 6, 1))
 
 
+def test_max_retries_zero_rejected(tmp_path):
+    # max_retries=0 would fall off the retry loop returning None -> a silently
+    # empty cached month; must fail loud instead, before any fetch happens.
+    calls = []
+    def fn(token, frm, to, interval):
+        calls.append(frm)
+        return recs(frm.date())
+    with pytest.raises(ValueError):
+        fetch_months(fn, "HDFCBANK", 341249,
+                     date(2024, 1, 1), date(2024, 1, 31),
+                     cache_dir=str(tmp_path), sleep=lambda s: None,
+                     max_retries=0, today=date(2024, 6, 1))
+    assert calls == []
+
+
 def test_clean_drops_bad_bars_and_dedupes():
     t = pd.Timestamp("2024-01-01 09:15")
     df = pd.DataFrame([

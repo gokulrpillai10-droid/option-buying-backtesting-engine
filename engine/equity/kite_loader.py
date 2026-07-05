@@ -71,6 +71,8 @@ def clean(df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
 
 def _fetch_retry(fetch_fn: Callable, token: int, lo: date, hi: date,
                  max_retries: int, sleep: Callable) -> list:
+    if max_retries < 1:
+        raise ValueError(f"max_retries must be >= 1, got {max_retries}")
     frm = datetime.combine(lo, datetime.min.time())
     to = datetime.combine(hi, datetime.max.time().replace(microsecond=0))
     for attempt in range(max_retries):
@@ -101,6 +103,8 @@ def fetch_months(fetch_fn: Callable, symbol: str, token: int,
             continue
         recs = _fetch_retry(fetch_fn, token, lo, hi, max_retries, sleep)
         df, _dropped = clean(_normalize(recs))
+        prefix = "WARNING: 0 bars -- " if len(df) == 0 else ""
+        print(f"{prefix}{symbol} {lo:%Y-%m}: {len(df)} bars")
         df.to_parquet(path, index=False)
         written += 1
         sleep(throttle)

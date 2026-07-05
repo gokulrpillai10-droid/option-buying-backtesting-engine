@@ -158,3 +158,16 @@ def test_qty_zero_when_capital_too_small():
     strat = OneShot("long", time(9, 20), capital=1000.0)  # < 1 share
     r = EquityBacktest(df, M).run(strat)
     assert r.trades == []
+
+
+def test_multiple_orders_per_bar_rejected():
+    # Equity v1 is single-position: two orders on one bar must fail loud,
+    # not silently drop the second.
+    class TwoShot(OneShot):
+        def on_bar(self, ctx):
+            orders = super().on_bar(ctx)
+            return orders * 2 if orders else []
+
+    df = two_flat_days({"09:25": (1702, 1702, 1702, 1702)})
+    with pytest.raises(ValueError):
+        EquityBacktest(df, M).run(TwoShot("long", time(9, 20)))
