@@ -1,6 +1,6 @@
 # Nifty Options Backtesting Engine
 
-Documentation of the backtesting engine in this project (`/Users/gokul/Desktop/build strategies `).
+Documentation of the backtesting engine in this project (`/Users/gokul/Desktop/buildstrategies`).
 
 ## Overview
 
@@ -160,7 +160,7 @@ Recurring lesson across all of these: **for NIFTY intraday option *buying*, abso
 
 ## Test Suite
 
-Run: `cd "/Users/gokul/Desktop/build strategies " && PYTHONPATH="$PWD" python3 -m pytest -q`
+Run: `cd /Users/gokul/Desktop/buildstrategies && PYTHONPATH="$PWD" python3 -m pytest -q`
 
 115 tests green across data/execution/position/strategy/driver layers, including the golden reconciliation and the liquidity-floor goldens. To add a new strategy: subclass `Strategy`, then
 `Backtest(MarketData(Catalog(ROOT), SpotSeries.from_index(ROOT), min_dte=N), CostModel(), Knobs(...)).run(strat, start, end)`.

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import calendar
 import glob
+import json
 import os
 import time as _time
 from datetime import date, datetime, timedelta
@@ -84,30 +85,78 @@ def _fetch_retry(fetch_fn: Callable, token: int, lo: date, hi: date,
             sleep(2 ** attempt)
 
 
+def _coverage_path(outdir: str) -> str:
+    return os.path.join(outdir, "_coverage.json")
+
+
+def _read_coverage(outdir: str) -> dict:
+    """{"YYYY-MM": "YYYY-MM-DD"} -- the requested end-date each cached month was
+    fetched THROUGH (not the data's last bar). Missing/corrupt => empty."""
+    p = _coverage_path(outdir)
+    if not os.path.exists(p):
+        return {}
+    try:
+        with open(p) as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def _write_coverage(outdir: str, cov: dict) -> None:
+    p = _coverage_path(outdir)
+    tmp = p + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(cov, f, indent=0, sort_keys=True)
+    os.replace(tmp, p)                               # atomic
+
+
 def fetch_months(fetch_fn: Callable, symbol: str, token: int,
                  start: date, end: date, cache_dir: str = DEFAULT_CACHE,
                  throttle: float = 0.35, max_retries: int = 5,
                  sleep: Callable = _time.sleep,
                  today: Optional[date] = None) -> Tuple[int, int]:
     """Fetch [start, end] month-by-month into {cache_dir}/{symbol}/{YYYY-MM}.parquet.
-    Complete cached months are skipped (resumable); the current month is
-    refetched. Returns (written, skipped)."""
+
+    Resumable via a ``_coverage.json`` manifest recording the end-date each month
+    was fetched THROUGH. A month is skipped only when it is finalized (``hi <
+    today`` -- no new bars can appear) AND its cached coverage already reaches the
+    requested end; a month first cached mid-month (partial) is re-fetched once it
+    ends, instead of being frozen with a permanent hole. An empty fetch result is
+    a transient API failure: it is never persisted (that would cement a gap) and
+    never overwrites good cached data -- the month is left to retry. Returns
+    (written, skipped)."""
     today = today or date.today()
     outdir = os.path.join(cache_dir, symbol)
     os.makedirs(outdir, exist_ok=True)
+    cov = _read_coverage(outdir)
     written = skipped = 0
     for lo, hi in month_range(start, end):
-        path = os.path.join(outdir, f"{lo:%Y-%m}.parquet")
-        if os.path.exists(path) and hi < today:      # complete month already cached
+        key = f"{lo:%Y-%m}"
+        path = os.path.join(outdir, f"{key}.parquet")
+        if key not in cov and os.path.exists(path) and hi < today:
+            # legacy parquet from before coverage tracking: a finalized month on
+            # disk is assumed complete through its end -- record it so the skip
+            # below is explicit and future runs don't re-migrate it.
+            cov[key] = hi.isoformat()
+        if (os.path.exists(path) and hi < today
+                and cov.get(key, "") >= hi.isoformat()):
             skipped += 1
             continue
         recs = _fetch_retry(fetch_fn, token, lo, hi, max_retries, sleep)
         df, _dropped = clean(_normalize(recs))
-        prefix = "WARNING: 0 bars -- " if len(df) == 0 else ""
-        print(f"{prefix}{symbol} {lo:%Y-%m}: {len(df)} bars")
+        if len(df) == 0:
+            # never write an empty month (freezes a permanent gap) or overwrite
+            # good data with it -- warn and leave it retryable next run.
+            print(f"WARNING: 0 bars -- {symbol} {key}: not written (will retry)")
+            sleep(throttle)
+            continue
+        print(f"{symbol} {key}: {len(df)} bars")
         df.to_parquet(path, index=False)
+        cov[key] = hi.isoformat()
+        _write_coverage(outdir, cov)                 # persist per month (crash-safe)
         written += 1
         sleep(throttle)
+    _write_coverage(outdir, cov)                     # persist any legacy migrations
     return written, skipped
 
 
