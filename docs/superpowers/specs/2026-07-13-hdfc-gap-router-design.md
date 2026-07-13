@@ -87,27 +87,53 @@ Features:
 
 ## 4. Components & engine integration
 
-- **`engine/equity/nifty_gap.py`** — `NiftyGapProvider`: loads the NIFTY 5-min
-  CSV once (`/Users/gokul/Desktop/tradealgo/nifty_5min_5yr.csv`, path
-  configurable), aggregates to per-date open/close → gap, exposes
-  `gap_for(date)`. External-file dependency, isolated behind this provider.
-- **`GapRouterEquity`** — new strategy class beside `CPRBreakoutEquity`, same
-  interface; consumes `EquityBarContext` + injected NIFTY gap. Requires the
-  engine's intrabar / intraday-time entry support (entries fire at 09:30, not
-  next-open) — the exact interface is verified during planning; if the driver
-  only supports next-open fills, the plan adds an intraday-entry hook.
+**Engine requires NO changes** (verified against `engine/equity/backtest.py` +
+`context.py` during eng review):
+- Intraday entry is look-ahead safe: `on_bar(ctx)` per 5-min bar; an order on
+  bar `b` fills at `b+timeframe` open (`backtest.py:98-106`). The 09:30 decision
+  fills next bar. No engine hook needed.
+- Router features are already on the context: `opening_range(end_time)`,
+  `prev_close`, `prev_day_hlc`, `recent(n)`.
+- Exits exist: `level` (intrabar stop/target via `resolve_level_exit`) + auto
+  EOD square-off. FADE target/stop are level exits; GO holds to EOD.
+- One-order/bar + one-position/day already enforced (`backtest.py:94`).
+
+Components:
+- **`engine/equity/gap_features.py`** — shared, pure. `gap()`, `r15()`,
+  `aligned()`, and `classify(gap, ngap, r15, thr) -> Decision{branch, side}`.
+  Consumed by the strategy, the analysis scripts (`hdfc_gapandgo.py`), and the
+  unit tests, so the classification can never drift (same role `sr_core.py`
+  plays for the S/R tools). DRY.
+- **`engine/equity/nifty_gap.py`** — `NiftyGapProvider`: loads a **snapshotted,
+  in-repo** per-date NIFTY gap table (see below); exposes `gap_for(date)`.
+  Returns `None` for missing dates (→ treated as not-aligned, §6).
+- **NIFTY snapshot store** — a small checked-in table under `data_index/NIFTY/`
+  holding per-date `open` + `prev_close` (→ gap), plus a one-time build/refresh
+  script (`analysis/snapshot_nifty_gap.py`) that derives it from the NIFTY
+  source and pulls forward when new data arrives. Keeps the backtest fully
+  offline/reproducible — no sibling-repo coupling at backtest time.
+- **`GapRouterEquity`** — new strategy class beside the existing equity
+  strategies, same `on_day_start` / `on_bar` / `manage` interface; the
+  `NiftyGapProvider` is injected via its constructor (the `EquityBarContext`
+  stays spot-only — no context change). Sets a `traded_today` flag in
+  `on_day_start` to enforce one trade/day (§6).
 - **`analysis/gap_router_backtest.py`** — runs the OOS backtest, prints
   per-branch + combined metrics.
 - Reuses `EquityOrder` / `EquityPosition`; reads only cached data (offline,
   reproducible).
+
+**Timeframe:** run the router on 1-min bars (`EquityKnobs.timeframe="1min"`)
+rather than the 5-min default — the fade edge is thin and a 5-min entry delay
+on the open-fade branch eats it. Timeframe is a knob; validate 1m vs 5m in §5.
 
 ## 5. Validation
 
 - **Train 2020–2023 → fit thresholds; test 2024–2026 out-of-sample.** The §2
   thresholds were derived on the full sample, so only the OOS split is
   trustworthy; in-sample numbers are reported but not relied on.
-- **Costs ~0.10% round-trip** (intraday brokerage + STT + slippage) modeled and
-  reported net. Gross edge is 0.3–0.7%, so cost is make-or-break.
+- **Costs use the engine's own model** — `EquityCostModel` (`costs.py`) +
+  `EquityKnobs.slippage_pct` (0.05%/side), not an invented flat number. Gross
+  edge is 0.3–0.7%, so net-of-cost is the go/no-go signal.
 - Metrics per branch and combined: trades, win %, avg net return, expectancy,
   profit factor, max drawdown, equity curve.
 - **Unit tests:** feature calc (`gap`, `r15`, alignment), and router decisions
@@ -121,6 +147,9 @@ Features:
 - Missing `prev_close` (first session) → NO-TRADE.
 - No 09:30 bars (data hole / half day) → NO-TRADE that day.
 - Short/holiday sessions → OR still = first 15 min from actual open.
+- **Re-entry guard:** after a FADE exits at target intraday, `on_bar` fires
+  again (`backtest.py:91`) and could open a second trade. A `traded_today` flag
+  set in `on_day_start` enforces one trade/day. Must have a unit test.
 
 ## 7. Risks & caveats
 
