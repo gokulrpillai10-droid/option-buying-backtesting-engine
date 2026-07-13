@@ -7,6 +7,8 @@ gaps defer. 09:30: deferred gaps that reverted fade; those still driving hard
 Exits: FADE targets prior close (resting level) with a stop when a bar CLOSES
 beyond the opening-range extreme (active only once the 09:15-09:30 range is
 complete). GO holds to EOD with the same opening-range stop, no fixed target.
+The opening range itself is tracked incrementally bar-by-bar (not recomputed
+via a full-history scan) since it is immutable after 09:30.
 """
 from datetime import time
 
@@ -31,10 +33,13 @@ class GapRouterEquity(Strategy):
         self.decided_0930 = False
         self.pending = None          # ("fade"/"go", side) to emit next on_bar
         self.branch = self.side = None
+        self._or_high = self._or_low = None   # seeded below / by _track_or
         self.pc = ctx.prev_close()
         if self.pc is None:
             return
         self.open = ctx.spot_bar.open
+        self._or_high = ctx.spot_bar.high      # seed with the 09:15 bar
+        self._or_low = ctx.spot_bar.low
         self.gap = compute_gap(self.open, self.pc)
         self.ngap = self.nifty.gap_for(ctx.now.date())
         self.active = True
@@ -45,7 +50,25 @@ class GapRouterEquity(Strategy):
             self.pending = ("fade", d.side)      # open fade -> emit at first bar
         # "defer" -> handled at 09:30 in on_bar
 
+    def _track_or(self, ctx):
+        # SpotSeries.history() (engine/data/spot.py:141) rebuilds the ENTIRE
+        # bar list via iterrows() on every call -> O(N) per bar, O(N^2) per
+        # backtest. ctx.opening_range() calls history() under the hood, so
+        # calling it every bar while a position is open turned a 6-year
+        # backtest quadratic. The opening range is immutable after OR_END,
+        # so track it incrementally off ctx.spot_bar (O(1) dict lookup)
+        # instead. Do not revert to ctx.opening_range() in manage()/on_bar().
+        if ctx.spot_bar is None:
+            return
+        if self._or_high is None:
+            self._or_high, self._or_low = ctx.spot_bar.high, ctx.spot_bar.low
+            return
+        if ctx.now.time() <= self.OR_END:
+            self._or_high = max(self._or_high, ctx.spot_bar.high)
+            self._or_low = min(self._or_low, ctx.spot_bar.low)
+
     def on_bar(self, ctx):
+        self._track_or(ctx)
         if not self.active or self.traded:
             return []
         if self.pending is not None:
@@ -68,10 +91,11 @@ class GapRouterEquity(Strategy):
         return [EquityOrder(direction=side, capital=self.CAPITAL)]
 
     def manage(self, ctx, pos):
+        self._track_or(ctx)
         if ctx.now.time() >= self.SQUARE:
             return Exit.market("eod")
         # opening-range stop is live only once the 09:15-OR_END range is complete
-        orng = ctx.opening_range(self.OR_END) if ctx.now.time() >= self.OR_END else None
+        orng = (self._or_high, self._or_low) if ctx.now.time() >= self.OR_END else None
         close = ctx.spot_bar.close
         if orng is not None:
             or_high, or_low = orng
