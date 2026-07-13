@@ -95,3 +95,47 @@ def test_manage_square_off():
     pos = EquityPosition(direction="short", entry=802.0, qty=100)
     ex = strat.manage(EquityBarContext(now=datetime(2024, 1, 2, 15, 15), spot=spot), pos)
     assert ex.kind == "market" and ex.reason == "eod"
+
+
+def test_manage_or_stop_fires_on_close_beyond_range():
+    # fade-short scenario: day2 base 802 (+0.25% gap) -> fade short at 09:15 open.
+    # Bump 09:20 to 803 so the opening range (09:15-09:30, all bars <= 09:30) has
+    # spread: or_high = max(802, 803, 802, ...) = 803, or_low = min(...) = 802.
+    # 09:45 closes at 805, well above or_high=803 -> OR stop for the short.
+    spot = series(802.0, {
+        "09:20": (803.0, 803.0, 803.0, 803.0),
+        "09:45": (805.0, 805.0, 805.0, 805.0),
+    })
+    strat = GapRouterEquity(FakeNifty(None))
+    run(spot, strat)                            # fade short at open
+    pos = EquityPosition(direction="short", entry=802.0, qty=100)
+
+    # before 09:30 the OR stop is not active yet -> falls through to the fade
+    # target (resting level at prior close 800), even though 09:20's own close
+    # (803) is already above what will become or_high.
+    ex_before = strat.manage(EquityBarContext(now=datetime(2024, 1, 2, 9, 20), spot=spot), pos)
+    assert ex_before.kind == "level" and ex_before.trigger == "fall" and ex_before.level == 800.0
+
+    # at/after 09:30 the range (803, 802) is complete and live; 09:45 closes at
+    # 805 > or_high=803 -> market stop-out.
+    ex_after = strat.manage(EquityBarContext(now=datetime(2024, 1, 2, 9, 45), spot=spot), pos)
+    assert ex_after.kind == "market" and ex_after.reason == "or_stop"
+
+
+def test_manage_go_branch_holds_when_no_stop():
+    # big aligned gap: day2 opens 810, NIFTY aligned +1%, drives to 815 by 09:30
+    # -> GO long at 09:30. Opening range (bars 09:15..09:30 inclusive) is flat
+    # 810 from 09:15-09:29 plus the 815 spike at 09:30: or_high=815, or_low=810.
+    spot = series(810.0, {"09:30": (815.0, 815.0, 815.0, 815.0)})
+    strat = GapRouterEquity(FakeNifty(0.01))
+    run(spot, strat)                            # go long at 09:30
+    pos = EquityPosition(direction="long", entry=815.0, qty=100)
+
+    # 10:00 close = 810 (flat base) which is >= or_low=810 -> stop condition
+    # (close < or_low) is false, and GO has no fixed target -> manage() holds.
+    ex_hold = strat.manage(EquityBarContext(now=datetime(2024, 1, 2, 10, 0), spot=spot), pos)
+    assert ex_hold is None
+
+    # EOD square-off still applies regardless of branch.
+    ex_eod = strat.manage(EquityBarContext(now=datetime(2024, 1, 2, 15, 15), spot=spot), pos)
+    assert ex_eod.kind == "market" and ex_eod.reason == "eod"
