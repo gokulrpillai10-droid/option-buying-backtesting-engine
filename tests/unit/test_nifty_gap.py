@@ -1,5 +1,7 @@
+from datetime import date
 import pandas as pd
 from analysis.snapshot_nifty_gap import build_gap_table
+from engine.equity.nifty_gap import NiftyGapProvider
 
 def test_build_gap_table_computes_daily_gap():
     df = pd.DataFrame({
@@ -14,3 +16,10 @@ def test_build_gap_table_computes_daily_gap():
     # first day dropped (no prior close); day2 gap = 121/110 - 1
     assert list(out["date"].astype(str)) == ["2024-01-02"]
     assert out["ngap"].iloc[0] == 121.0 / 110.0 - 1.0
+
+def test_provider_lookup(tmp_path):
+    p = tmp_path / "gap.parquet"
+    pd.DataFrame({"date": [date(2024, 1, 2)], "ngap": [0.0123]}).to_parquet(p)
+    prov = NiftyGapProvider(store_path=str(p))
+    assert prov.gap_for(date(2024, 1, 2)) == 0.0123
+    assert prov.gap_for(date(2024, 1, 3)) is None   # missing -> None (not aligned)
