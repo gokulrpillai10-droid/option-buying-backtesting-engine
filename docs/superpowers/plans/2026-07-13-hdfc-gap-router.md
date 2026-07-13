@@ -708,6 +708,42 @@ git commit -m "feat(equity): Gap Router OOS backtest runner (train-fit, frozen t
 
 ## Verification (whole plan)
 
-- [ ] Run the full unit suite: `pytest tests/unit/test_gap_features.py tests/unit/test_nifty_gap.py tests/unit/test_gap_router_equity.py -v` — all green.
-- [ ] Confirm no `engine/` files changed: `git diff --name-only main...HEAD | grep '^engine/' ` shows only the two NEW files (`gap_features.py`, `nifty_gap.py`), no modifications to existing engine files.
-- [ ] Record the OOS test result (net, PF, win, by-year) — that number is the go/no-go on whether the router is worth trading.
+- [x] Run the full unit suite: `pytest tests/unit/test_gap_features.py tests/unit/test_nifty_gap.py tests/unit/test_gap_router_equity.py -v` — all green (20 passed; full suite 179 passed).
+- [x] Confirm no `engine/` files changed: `git diff --name-only main...HEAD | grep '^engine/' ` shows only the two NEW files (`gap_features.py`, `nifty_gap.py`), no modifications to existing engine files.
+- [x] Record the OOS test result (net, PF, win, by-year) — that number is the go/no-go on whether the router is worth trading. **See Results below.**
+
+## Results (2026-07-13) — VERDICT: NO-GO
+
+Backtest executed per Task 5 (1-min bars, `EquityCostModel` + 0.05%/side slippage,
+₹100k/trade). Thresholds swept on TRAIN only (best: `big_thr=0.005`,
+`drive_thr=0.004`), frozen for TEST. Reproduce: `PYTHONPATH=. python3
+analysis/gap_router_backtest.py` (independently re-run at review, byte-identical).
+
+| Split | Trades | Net | PF | Win % | tail-5 |
+|---|---|---|---|---|---|
+| TRAIN 2020–2023 (fitted) | 652 | **−₹119,026** | 0.49 | 33.0% | −₹135,097 |
+| TEST 2024–2026 (frozen OOS) | 437 | **−₹64,420** | 0.43 | 30.2% | −₹71,917 |
+
+Test by-year: 2024 −26,541 / 2025 −30,407 / 2026 −7,473. No combination in the
+3×3 train grid was profitable — the sweep selected the least-negative.
+
+**Diagnosis (unverified hypothesis):** the signal analysis (56% directional win,
+70% gap-fill) measured hold-to-fill/EOD with **no stop**; the strategy's
+opening-range stop drops the win rate to 33% — consistent with the stop exiting
+mean-reversion trades at max adversity before the fill completes. Note the 09:30
+bar is included in BOTH the OR range and the 09:30 decision (`<=` boundary in
+`context.opening_range`, mirrored by the strategy's `_track_or`).
+
+**Follow-up (train split only; TEST stays frozen):** ablation on the exit
+structure — no stop / wider stop / per-branch (fade vs go) attribution in the
+runner. Also carried: test for `decide_0930`'s aligned-disjunct; wall-clock
+`OR_END=09:30` diverges from spec §6 on late-start sessions (~6 Muhurat sessions
+in 6 yrs — immaterial, fold into ablation); engine-level `SpotSeries.history()`
+O(N) `iterrows()` scan (out of scope here; strategy caches OR incrementally
+instead — see `_track_or` comment, commit 2ed98fa; plan's Task 4 listing shows
+the pre-fix `ctx.opening_range()` version).
+
+**What the branch delivers:** reusable `gap_features` (pure router core),
+`NiftyGapProvider` + offline snapshot pattern, an honest train/frozen-test
+harness, 20 tests — and a recorded negative result: this exit structure does
+not trade the gap edge profitably net of costs.
