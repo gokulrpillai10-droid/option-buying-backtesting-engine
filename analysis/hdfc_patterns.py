@@ -17,25 +17,31 @@ import glob
 import numpy as np
 import pandas as pd
 
+from sr_core import assert_no_basis_seam
+
 CACHE = "/Users/gokul/Desktop/buildstrategies/data_equity/HDFCBANK"
 LOOKBACK_DAYS = 365
+MIN_BARS = 300                        # full-session gate, same as the engine
 
 files = sorted(glob.glob(f"{CACHE}/*.parquet"))[-14:]
 df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
 df = df.sort_values("DateTime").set_index("DateTime")
 df = df[df.index >= df.index.max() - pd.Timedelta(days=LOOKBACK_DAYS)]
+assert_no_basis_seam(df)
 df["day"] = df.index.normalize()
 
 # ---- build a per-session table ------------------------------------------------
+# EVERY session goes in the table (partial ones too) so shift(1) prev_* always
+# reflects the truly previous session's levels; partial sessions are then
+# excluded from the study universe only.
 rows = []
 for day, g in df.groupby("day"):
     g = g.sort_index()
     o, c = g["Open"].iloc[0], g["Close"].iloc[-1]
     hi, lo = g["High"].max(), g["Low"].min()
     or15 = g[g.index < day + pd.Timedelta(hours=9, minutes=30)]
-    if len(or15) == 0:
-        continue
-    orh, orl = or15["High"].max(), or15["Low"].min()
+    orh = or15["High"].max() if len(or15) else np.nan
+    orl = or15["Low"].min() if len(or15) else np.nan
     hod_t = g["High"].idxmax()
     lod_t = g["Low"].idxmin()
     rows.append({
@@ -43,13 +49,18 @@ for day, g in df.groupby("day"):
         "high": hi, "low": lo, "orh": orh, "orl": orl,
         "hod_min": hod_t.hour * 60 + hod_t.minute,
         "lod_min": lod_t.hour * 60 + lod_t.minute,
+        "n_bars": len(g),
         "bars": g,
     })
 S = pd.DataFrame(rows).reset_index(drop=True)
 S["prev_close"] = S["close"].shift(1)
 S["prev_high"] = S["high"].shift(1)
 S["prev_low"] = S["low"].shift(1)
-S = S.dropna(subset=["prev_close"]).reset_index(drop=True)
+n_partial = int((S["n_bars"] < MIN_BARS).sum())
+if n_partial:
+    print(f"excluded {n_partial} partial session(s) (<{MIN_BARS} bars): "
+          f"{[f'{d:%Y-%m-%d}' for d in S.loc[S['n_bars'] < MIN_BARS, 'day']]}")
+S = S[S["n_bars"] >= MIN_BARS].dropna(subset=["prev_close", "orh"]).reset_index(drop=True)
 S["gap"] = S["open"] / S["prev_close"] - 1
 S["o2c"] = S["close"] / S["open"] - 1
 S["c2c"] = S["close"] / S["prev_close"] - 1
@@ -119,11 +130,13 @@ for side in ("long", "short"):
 print(f"  no-break days n={res['none']}")
 
 # ---- D) HoD / LoD timing ------------------------------------------------------
-print(f"\n{'='*66}\nD) HIGH-OF-DAY / LOW-OF-DAY FORMATION TIME  (30m buckets)")
-buckets = [(555, 585, "09:15-09:45"), (585, 645, "09:45-10:45"),
-           (645, 765, "10:45-12:45"), (765, 885, "12:45-14:45"),
-           (885, 960, "14:45-15:30")]
-for lo, hi, lbl in buckets:
+# equal-width buckets: unequal widths make the row percentages incomparable
+# (a 2h bucket shows ~4x a 30m bucket under a uniform distribution)
+print(f"\n{'='*66}\nD) HIGH-OF-DAY / LOW-OF-DAY FORMATION TIME  (30-min buckets)")
+SESSION_OPEN_MIN, SESSION_END_MIN = 9 * 60 + 15, 15 * 60 + 30    # 09:15, 15:30
+for lo in range(SESSION_OPEN_MIN, SESSION_END_MIN, 30):
+    hi = min(lo + 30, SESSION_END_MIN)
+    lbl = f"{lo//60:02d}:{lo%60:02d}-{hi//60:02d}:{hi%60:02d}"
     h = ((S["hod_min"] >= lo) & (S["hod_min"] < hi)).mean() * 100
     l = ((S["lod_min"] >= lo) & (S["lod_min"] < hi)).mean() * 100
     print(f"  {lbl}   HoD={h:4.1f}%   LoD={l:4.1f}%")
