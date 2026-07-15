@@ -2,12 +2,14 @@
 Method: fractal swing pivots (window k) -> cluster within tol% -> rank by
 touch-count and recency. Reports nearest levels around the last close."""
 import glob
+import sys
 import pandas as pd
 
 from sr_core import (assert_no_basis_seam, cluster, drop_partial_sessions,
                      pivots, resample)
 
-CACHE = "/Users/gokul/Desktop/buildstrategies/data_equity/HDFCBANK"
+SYMBOL = sys.argv[1] if len(sys.argv) > 1 else "HDFCBANK"
+CACHE = f"/Users/gokul/Desktop/buildstrategies/data_equity/{SYMBOL}"
 
 # recent context: last two cached months is plenty for intraday S/R
 files = sorted(glob.glob(f"{CACHE}/*.parquet"))[-2:]

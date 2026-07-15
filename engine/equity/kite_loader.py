@@ -26,7 +26,8 @@ from typing import Callable, List, Optional, Tuple
 import pandas as pd
 
 TRADEALGO_ENV = "/Users/gokul/Desktop/tradealgo/.env"
-INSTRUMENT_TOKENS = {"HDFCBANK": 341249}          # NSE instrument tokens
+INSTRUMENT_TOKENS = {"HDFCBANK": 341249,          # NSE instrument tokens
+                     "ADANIENT": 6401}
 DEFAULT_CACHE = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
     "data_equity")

@@ -8,16 +8,19 @@ recency. Then cross-timeframe confluence: zones whose price bands overlap across
 Run: PYTHONPATH=<repo> python3 analysis/hdfc_sr_multiframe.py
 """
 import glob
+import sys
 import pandas as pd
 
 from sr_core import (assert_no_basis_seam, cluster, drop_partial_sessions,
                      pivots, resample)
 
-CACHE = "/Users/gokul/Desktop/buildstrategies/data_equity/HDFCBANK"
-LOOKBACK_DAYS = 365
+SYMBOL = sys.argv[1] if len(sys.argv) > 1 else "HDFCBANK"
+CACHE = f"/Users/gokul/Desktop/buildstrategies/data_equity/{SYMBOL}"
+LOOKBACK_DAYS = int(sys.argv[2]) if len(sys.argv) > 2 else 365
 
-# load enough months to cover the lookback (14 months of files, then trim by date)
-files = sorted(glob.glob(f"{CACHE}/*.parquet"))[-14:]
+# load enough months to cover the lookback, then trim by date
+n_files = LOOKBACK_DAYS // 30 + 2
+files = sorted(glob.glob(f"{CACHE}/*.parquet"))[-n_files:]
 df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
 df = df.sort_values("DateTime").set_index("DateTime")
 cutoff = df.index.max() - pd.Timedelta(days=LOOKBACK_DAYS)

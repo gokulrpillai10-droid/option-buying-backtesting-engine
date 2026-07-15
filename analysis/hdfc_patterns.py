@@ -14,12 +14,14 @@ stats (A, B) are split H1/H2 to check they aren't just the trend.
 Run: PYTHONPATH=<repo> python3 analysis/hdfc_patterns.py
 """
 import glob
+import sys
 import numpy as np
 import pandas as pd
 
 from sr_core import assert_no_basis_seam
 
-CACHE = "/Users/gokul/Desktop/buildstrategies/data_equity/HDFCBANK"
+SYMBOL = sys.argv[1] if len(sys.argv) > 1 else "HDFCBANK"
+CACHE = f"/Users/gokul/Desktop/buildstrategies/data_equity/{SYMBOL}"
 LOOKBACK_DAYS = 365
 MIN_BARS = 300                        # full-session gate, same as the engine
 
