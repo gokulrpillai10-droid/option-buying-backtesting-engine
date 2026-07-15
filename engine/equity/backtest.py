@@ -99,7 +99,7 @@ class EquityBacktest:
                     # signal on the day's last bar has no next bar -> dropped (no fill)
                     if fb is not None:
                         fill = self._entry_fill(fb.open, o.direction)
-                        qty = int(o.capital // fill)
+                        qty = o.qty if o.qty is not None else int(o.capital // fill)
                         if qty > 0:
                             pos = EquityPosition(direction=o.direction,
                                                  entry=fill, qty=qty)
