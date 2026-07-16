@@ -30,11 +30,10 @@ from datetime import time
 
 from engine.execution.model import Order
 from engine.strategy.base import Strategy
-from engine.strategy.exit import Exit
+from engine.strategy.exit import Exit, TwoStage
 
 LOTS = 6
 ITM_DEPTH = 150          # deep-ITM (~delta 0.8)
-_NO_STOP = -1e18         # an unreachable premium stop (when loss-cap is off)
 
 
 def _strike(spot, side):
@@ -54,6 +53,8 @@ class CPRBreakout(Strategy):
         self.max_cpr_ratio = max_cpr_ratio         # skip days where width/(H-L) exceeds this (None=off)
         self.max_iv = max_iv                       # skip high-vol days: day-open ATM IV > this (None=off)
         self.ENTRY_CUTOFF, self.SQUARE = entry_cutoff, square
+        # book BOOK_FRAC at +BOOK_PREM (with the optional loss-cap), trail the rest
+        self._two = TwoStage(book_prem, trail_prem, self.BOOK_FRAC, stop_pts=stop_prem)
 
     def on_day_start(self, ctx):
         hlc = ctx.prev_day_hlc()
@@ -80,7 +81,7 @@ class CPRBreakout(Strategy):
         self.entered = False
         self.side = None
         self.stop_close = None
-        self._full = None
+        self._two.reset()
 
     @staticmethod
     def _day_open_iv(ctx):
@@ -119,17 +120,12 @@ class CPRBreakout(Strategy):
     def manage(self, ctx, pos):
         if ctx.now.time() >= self.SQUARE:
             return Exit.market("eod")
-        if self._full is None:
-            self._full = pos.qty
-        if pos.qty >= self._full:                                  # stage 1: full size, not yet booked
+        if not self._two.scaled(pos):                              # stage 1: full size, not yet booked
             close = ctx.spot_bar.close
             if pos.side == "CALL" and close < self.stop_close:     # CPR-close stop (full)
                 return Exit.market("cpr_stop")
             if pos.side == "PUT" and close > self.stop_close:
                 return Exit.market("cpr_stop")
-            # premium loss-cap (optional, full) + partial target scale-out, intrabar
-            stop_level = (pos.entry - self.STOP_PREM) if self.STOP_PREM is not None else _NO_STOP
-            return Exit.bracket(stop=stop_level, target=pos.entry + self.BOOK_PREM,
-                                stop_reason="pstop", target_reason="book",
-                                stop_fraction=1.0, target_fraction=self.BOOK_FRAC)
-        return Exit.trail(self.TRAIL_PREM, "ptrail")               # stage 2: trail the carried lots
+        # stage 1: loss-cap (optional, full) + partial target scale-out, intrabar;
+        # stage 2: trail the carried lots' premium
+        return self._two.exit_for(pos)

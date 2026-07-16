@@ -146,6 +146,168 @@ def test_premium_trail_exits_20_off_the_peak():
     assert res.trades[0].reason == "ptrail" and res.trades[0].exit == pytest.approx(110.0)
 
 
+class BuyThenArmedTrail(Strategy):
+    def __init__(self, arm):
+        self._arm = arm
+
+    def on_day_start(self, ctx):
+        self._in = False
+
+    def on_bar(self, ctx):
+        if not self._in:
+            self._in = True
+            return [Order(side="CALL", strike=20000, lots=1)]
+        return []
+
+    def manage(self, ctx, pos):
+        from engine.strategy.exit import Exit
+        return Exit.trail(20, "ptrail", arm=self._arm)
+
+
+def test_armed_trail_dormant_until_peak_reaches_arm_level():
+    # same tape as the plain-trail test (peak 130, drop to 105 = 25 off the peak):
+    # arm 140 is never reached -> the 20pt trail must stay dormant -> EOD exit;
+    # arm 125 IS reached intrabar -> fires exactly like the unarmed trail at 110
+    d1 = date(2024, 1, 2)
+    spot = SpotSeries(pd.DataFrame(
+        [(datetime(2024, 1, 1 + 1, 9, m), 100.0, 100.0, 100.0, 100.0) for m in (15, 20, 25, 30)],
+        columns=["DateTime", "Open", "High", "Low", "Close"]))
+    bars = {20: (100, 100, 100, 100),
+            25: (110, 130, 120, 128),
+            30: (118, 125, 105, 108),
+            35: (108, 109, 107, 108)}
+    rows = [make_row(datetime(2024, 1, 2, 9, m), 20000, call_open=o, call_high=h,
+                     call_low=l, call_close=c) for m, (o, h, l, c) in bars.items()]
+    chain = Chain(pd.DataFrame(rows, columns=CHAIN_COLUMNS))
+    market = lambda: FakeMarket(spot, [(date(2024, 1, 11), {d1: chain})])
+
+    res = Backtest(market(), CostModel()).run(BuyThenArmedTrail(arm=140), d1, d1)
+    assert len(res.trades) == 1 and res.trades[0].reason == "eod"
+
+    res = Backtest(market(), CostModel()).run(BuyThenArmedTrail(arm=125), d1, d1)
+    assert len(res.trades) == 1
+    assert res.trades[0].reason == "ptrail" and res.trades[0].exit == pytest.approx(110.0)
+
+
+class BuyScaleOutThenTrail(Strategy):
+    """Half out at a premium level, then trail the remainder (ema5_itm's scale_trail shape)."""
+    def on_day_start(self, ctx):
+        self._in, self._init_qty = False, None
+
+    def on_bar(self, ctx):
+        if not self._in:
+            self._in = True
+            return [Order(side="CALL", strike=20000, lots=1)]
+        return []
+
+    def manage(self, ctx, pos):
+        from engine.strategy.exit import Exit
+        if self._init_qty is None:
+            self._init_qty = pos.qty
+        if pos.qty < self._init_qty:
+            return Exit.trail(20, "ptrail")
+        return Exit.at(125, "rise", "scale", fraction=0.5)
+
+
+def test_scale_out_half_then_trail_remainder():
+    # bar 25 hits the 125 scale level (half out at 125); the trail takes over
+    # NEXT bar and its peak references highs from activation on (not the
+    # scale-out bar's 130): bar 30 peak 125 -> stop 105, low 105 -> rest at 105
+    d1 = date(2024, 1, 2)
+    spot = SpotSeries(pd.DataFrame(
+        [(datetime(2024, 1, 1 + 1, 9, m), 100.0, 100.0, 100.0, 100.0) for m in (15, 20, 25, 30)],
+        columns=["DateTime", "Open", "High", "Low", "Close"]))
+    bars = {20: (100, 100, 100, 100),
+            25: (110, 130, 120, 128),
+            30: (118, 125, 105, 108),
+            35: (108, 109, 107, 108)}
+    rows = [make_row(datetime(2024, 1, 2, 9, m), 20000, call_open=o, call_high=h,
+                     call_low=l, call_close=c) for m, (o, h, l, c) in bars.items()]
+    chain = Chain(pd.DataFrame(rows, columns=CHAIN_COLUMNS))
+    res = Backtest(FakeMarket(spot, [(date(2024, 1, 11), {d1: chain})]),
+                   CostModel()).run(BuyScaleOutThenTrail(), d1, d1)
+    assert len(res.trades) == 2
+    full = lot_size_for(d1)
+    assert res.trades[0].reason == "scale" and res.trades[0].exit == pytest.approx(125.0)
+    assert res.trades[0].qty == pytest.approx(full / 2)
+    assert res.trades[1].reason == "ptrail" and res.trades[1].exit == pytest.approx(105.0)
+    assert res.trades[1].qty == pytest.approx(full / 2)
+
+
+class BuyBracketScaleThenTrail(Strategy):
+    """Full-size premium stop bracketed with a half target, then trail the rest
+    (ema5_itm's scale_trail + prem_sl shape)."""
+    def __init__(self, stop):
+        self._stop = stop
+
+    def on_day_start(self, ctx):
+        self._in, self._init_qty = False, None
+
+    def on_bar(self, ctx):
+        if not self._in:
+            self._in = True
+            return [Order(side="CALL", strike=20000, lots=1)]
+        return []
+
+    def manage(self, ctx, pos):
+        from engine.strategy.exit import Exit
+        if self._init_qty is None:
+            self._init_qty = pos.qty
+        if pos.qty < self._init_qty:
+            return Exit.trail(20, "ptrail")
+        return Exit.bracket(self._stop, 125, stop_reason="psl",
+                            target_reason="scale", target_fraction=0.5)
+
+
+def test_bracket_scale_out_then_trail_remainder():
+    d1 = date(2024, 1, 2)
+    spot = SpotSeries(pd.DataFrame(
+        [(datetime(2024, 1, 1 + 1, 9, m), 100.0, 100.0, 100.0, 100.0) for m in (15, 20, 25, 30)],
+        columns=["DateTime", "Open", "High", "Low", "Close"]))
+    bars = {20: (100, 100, 100, 100),
+            25: (110, 130, 120, 128),
+            30: (118, 125, 105, 108),
+            35: (108, 109, 107, 108)}
+    rows = [make_row(datetime(2024, 1, 2, 9, m), 20000, call_open=o, call_high=h,
+                     call_low=l, call_close=c) for m, (o, h, l, c) in bars.items()]
+    chain = Chain(pd.DataFrame(rows, columns=CHAIN_COLUMNS))
+    market = lambda: FakeMarket(spot, [(date(2024, 1, 11), {d1: chain})])
+    full = lot_size_for(d1)
+
+    # stop 88 never touched -> half out at 125, trail books the rest at 105
+    # (same-bar stop-first priority is covered in unit test_exit.py)
+    res = Backtest(market(), CostModel()).run(BuyBracketScaleThenTrail(stop=88), d1, d1)
+    assert [t.reason for t in res.trades] == ["scale", "ptrail"]
+    assert res.trades[0].exit == pytest.approx(125.0)
+    assert res.trades[1].exit == pytest.approx(105.0)
+    assert all(t.qty == pytest.approx(full / 2) for t in res.trades)
+
+
+def test_bracket_stop_keeps_resting_after_partial_in_same_window():
+    # 1-min chain bars inside one 5-min strategy bar: the target books half at
+    # 125 on the 9:21 bar, then the STOP must still be live for the window's
+    # remaining bars -- 9:22 dives through 88 and takes the rest out at 88
+    d1 = date(2024, 1, 2)
+    spot = SpotSeries(pd.DataFrame(
+        [(datetime(2024, 1, 2, 9, m), 100.0, 100.0, 100.0, 100.0) for m in (15, 20, 25)],
+        columns=["DateTime", "Open", "High", "Low", "Close"]))
+    bars = {20: (100, 100, 100, 100),       # entry fill
+            21: (110, 130, 120, 128),       # target 125 books half
+            22: (95, 96, 80, 85),           # stop 88 takes the remainder
+            25: (85, 86, 84, 85)}
+    rows = [make_row(datetime(2024, 1, 2, 9, m), 20000, call_open=o, call_high=h,
+                     call_low=l, call_close=c) for m, (o, h, l, c) in bars.items()]
+    chain = Chain(pd.DataFrame(rows, columns=CHAIN_COLUMNS))
+    res = Backtest(FakeMarket(spot, [(date(2024, 1, 11), {d1: chain})]),
+                   CostModel()).run(BuyBracketScaleThenTrail(stop=88), d1, d1)
+    full = lot_size_for(d1)
+    assert [t.reason for t in res.trades] == ["scale", "psl"]
+    assert res.trades[0].exit == pytest.approx(125.0)
+    assert res.trades[1].exit == pytest.approx(88.0)
+    assert all(t.qty == pytest.approx(full / 2) for t in res.trades)
+    assert res.trades[0].exit_dt.minute == 21 and res.trades[1].exit_dt.minute == 22
+
+
 class BuyThenLevelTarget(Strategy):
     def on_day_start(self, ctx):
         self._in = False

@@ -159,13 +159,18 @@ class Backtest:
                 elif ex.kind == "bracket":           # premium stop/target, intrabar on option bars
                     for xdt, o, h, l in self._opt_window(chain, b, b + self._tf, pos.strike, pos.side):
                         fill, reason, frac = ex.resolve(o, h, l)
-                        if fill is not None:
-                            pos = self._book(pos, fill, reason, frac, slip,
-                                             day, entry_dt, xdt.to_pydatetime(), trades)
+                        if fill is None:
+                            continue
+                        pos = self._book(pos, fill, reason, frac, slip,
+                                         day, entry_dt, xdt.to_pydatetime(), trades)
+                        if pos is None:
                             break
+                        ex = ex.consume(reason)      # partial: the other side keeps resting this window
                 elif ex.kind == "trail":             # premium trailing stop, intrabar peak
                     for xdt, o, h, l in self._opt_window(chain, b, b + self._tf, pos.strike, pos.side):
                         peak = max(peak, h)
+                        if ex.arm is not None and peak < ex.arm:
+                            continue                 # dormant until the peak reaches the arm level
                         stop = peak - ex.gap
                         if l <= stop:
                             fill = o if o < stop else stop    # gap-through -> worse open
