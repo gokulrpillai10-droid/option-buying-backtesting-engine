@@ -36,6 +36,9 @@ class EquityKnobs:
     timeframe: str = "5min"
     min_bars_per_day: int = 300       # of 375; skips partial/Muhurat sessions
     max_overnight_gap: float = 0.15   # skip unadjusted corporate-action days
+    # stress dials (0 = off = historical behavior):
+    slippage_range_k: float = 0.0     # extra slip = k * (fill-bar high-low)/mid — fast tape pays more
+    entry_delay_bars: int = 0         # fill N extra strategy bars late (latency stress)
 
 
 class EquityBacktest:
@@ -95,10 +98,12 @@ class EquityBacktest:
                         raise ValueError(
                             f"equity v1 takes one order per bar (got {len(orders)})")
                     o = orders[0]
-                    fb = self._spot.bar_at(b + self._tf)
+                    fb = self._spot.bar_at(b + self._tf * (1 + self._k.entry_delay_bars))
                     # signal on the day's last bar has no next bar -> dropped (no fill)
                     if fb is not None:
-                        fill = self._entry_fill(fb.open, o.direction)
+                        mb = self._m1.bar_at(fb.dt)          # fill-minute range for slip
+                        hi, lo = (mb.high, mb.low) if mb is not None else (None, None)
+                        fill = self._entry_fill(fb.open, o.direction, hi, lo)
                         qty = o.qty if o.qty is not None else int(o.capital // fill)
                         if qty > 0:
                             pos = EquityPosition(direction=o.direction,
@@ -116,7 +121,9 @@ class EquityBacktest:
                     # no next bar on the day's last bar -> exit dropped here; falls
                     # through to the EOD square-off below
                     if fb is not None:
-                        t = pos.close(self._exit_fill(fb.open, pos.direction),
+                        mb = self._m1.bar_at(fb.dt)          # fill-minute range for slip
+                        hi, lo = (mb.high, mb.low) if mb is not None else (None, None)
+                        t = pos.close(self._exit_fill(fb.open, pos.direction, hi, lo),
                                       self._costs, reason=ex.reason)
                         trades.append(replace(t, date=day, entry_dt=entry_dt,
                                               exit_dt=fb.dt))
@@ -125,7 +132,7 @@ class EquityBacktest:
                     for xdt, o_, h_, l_ in self._m1_window(m1, b, b + self._tf):
                         fill, hit = resolve_level_exit(ex, o_, h_, l_)
                         if hit:
-                            t = pos.close(self._exit_fill(fill, pos.direction),
+                            t = pos.close(self._exit_fill(fill, pos.direction, h_, l_),
                                           self._costs, reason=ex.reason)
                             trades.append(replace(t, date=day, entry_dt=entry_dt,
                                                   exit_dt=xdt.to_pydatetime()))
@@ -134,19 +141,33 @@ class EquityBacktest:
 
         if pos is not None:                              # EOD square-off (MIS)
             last = m1.iloc[-1]
-            t = pos.close(self._exit_fill(float(last["Close"]), pos.direction),
+            t = pos.close(self._exit_fill(float(last["Close"]), pos.direction,
+                                          float(last["High"]), float(last["Low"])),
                           self._costs, reason="eod")
             trades.append(replace(t, date=day, entry_dt=entry_dt,
                                   exit_dt=last["DateTime"].to_pydatetime()))
         return trades
 
     # ---- fills: adverse slippage by direction ----
-    def _entry_fill(self, raw: float, direction: str) -> float:
+    def _eff_slip(self, high: Optional[float], low: Optional[float]) -> float:
+        """Base slip plus range-scaled friction at the fill bar (fast tape
+        costs more). slippage_range_k=0 -> flat base (historical behavior)."""
         s = self._k.slippage_pct
+        k = self._k.slippage_range_k
+        if k > 0 and high is not None and low is not None:
+            mid = (high + low) / 2.0
+            if mid > 0:
+                s += k * (high - low) / mid
+        return s
+
+    def _entry_fill(self, raw: float, direction: str,
+                    high: Optional[float] = None, low: Optional[float] = None) -> float:
+        s = self._eff_slip(high, low)
         return raw * (1 + s) if direction == "long" else raw * (1 - s)
 
-    def _exit_fill(self, raw: float, direction: str) -> float:
-        s = self._k.slippage_pct
+    def _exit_fill(self, raw: float, direction: str,
+                   high: Optional[float] = None, low: Optional[float] = None) -> float:
+        s = self._eff_slip(high, low)
         return raw * (1 - s) if direction == "long" else raw * (1 + s)
 
     @staticmethod

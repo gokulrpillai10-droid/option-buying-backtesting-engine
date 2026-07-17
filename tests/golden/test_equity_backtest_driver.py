@@ -160,6 +160,38 @@ def test_qty_zero_when_capital_too_small():
     assert r.trades == []
 
 
+def test_range_scaled_slippage_charges_fast_fill_minutes():
+    # fill minute 09:25 spans 1692-1712 (mid 1702, range 20): with k=0.1 the
+    # entry slip becomes 0.0005 + 0.1*20/1702; the flat-slip default is
+    # unchanged by construction (k=0)
+    df = two_flat_days({"09:25": (1702.0, 1712.0, 1692.0, 1702.0),
+                        "10:05": (1712.0, 1712.0, 1712.0, 1712.0)})
+    strat = lambda: OneShot("long", time(9, 20),
+                            manage_fn=lambda ctx, pos:
+                                Exit.market("out") if ctx.now.time() >= time(10, 0) else None)
+    r = EquityBacktest(df, M, EquityKnobs(slippage_range_k=0.1)).run(strat())
+    s_entry = 0.0005 + 0.1 * 20.0 / 1702.0
+    assert r.trades[0].entry == pytest.approx(1702.0 * (1 + s_entry))
+    assert r.trades[0].exit == pytest.approx(1712.0 * (1 - 0.0005))  # flat exit minute
+
+    r = EquityBacktest(df, M).run(strat())                           # k off -> flat
+    assert r.trades[0].entry == pytest.approx(1702.0 * (1 + 0.0005))
+
+
+def test_entry_delay_bars_fills_one_bar_later():
+    # signal 09:20 normally fills at the 09:25 open (1702); delayed one bar it
+    # fills at the 09:30 open (1706) instead
+    df = two_flat_days({"09:25": (1702.0, 1702.0, 1702.0, 1702.0),
+                        "09:30": (1706.0, 1706.0, 1706.0, 1706.0)})
+    strat = lambda: OneShot("long", time(9, 20))
+    r = EquityBacktest(df, M, EquityKnobs(entry_delay_bars=1)).run(strat())
+    assert r.trades[0].entry == pytest.approx(1706.0 * (1 + SLIP))
+    assert r.trades[0].entry_dt.time() == time(9, 30)
+
+    r = EquityBacktest(df, M).run(strat())
+    assert r.trades[0].entry == pytest.approx(1702.0 * (1 + SLIP))
+
+
 def test_multiple_orders_per_bar_rejected():
     # Equity v1 is single-position: two orders on one bar must fail loud,
     # not silently drop the second.
