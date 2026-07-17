@@ -29,6 +29,17 @@ def test_bracket_stop_takes_priority_when_both_in_bar():
     assert reason == "stop"
 
 
+def test_bracket_optimistic_lets_target_win_the_tie():
+    # both sides inside the bar: the true order is unknowable -- optimistic=True
+    # resolves the tie for the target (the other edge of the error band)
+    br = Exit.bracket(stop=70, target=130)
+    fill, reason, _ = br.resolve(open_=100, high=140, low=60, optimistic=True)
+    assert reason == "target" and fill == 130.0
+    # only the stop in range -> optimistic still takes the stop
+    fill, reason, _ = br.resolve(open_=100, high=101, low=68, optimistic=True)
+    assert reason == "stop" and fill == 70.0
+
+
 def test_bracket_no_hit():
     br = Exit.bracket(stop=70, target=130)
     fill, reason, frac = br.resolve(open_=100, high=120, low=90)

@@ -9,8 +9,9 @@ increment alongside the Backtest driver.
 """
 from __future__ import annotations
 
+import json
 from datetime import date
-from typing import Callable, Iterator, List, Optional, Tuple
+from typing import Callable, Iterable, Iterator, List, Optional, Tuple
 
 import pandas as pd
 
@@ -18,18 +19,35 @@ from engine.data.chain import Chain
 from engine.data.spot import SpotSeries
 
 
+def load_quarantine(path: str) -> set:
+    """The quarantined-day set written by analysis/data_integrity.py."""
+    with open(path) as f:
+        payload = json.load(f)
+    return {date.fromisoformat(d) for d in payload["quarantined"]}
+
+
 class MarketData:
     def __init__(self, catalog, spot: SpotSeries, min_dte: int = 3,
-                 reader: Callable[[str], pd.DataFrame] = pd.read_parquet):
+                 reader: Callable[[str], pd.DataFrame] = pd.read_parquet,
+                 quarantine: Optional[Iterable[date]] = None):
         self._cat = catalog
         self._spot = spot
         self._min_dte = min_dte
         self._read = reader
+        self._quarantine = set(quarantine) if quarantine else set()
         self._expiries = sorted(pd.Timestamp(e).date() for e in catalog.expiries())
         self._days = sorted({ts.to_pydatetime().date() for ts in spot.timestamps()})
 
     def trading_days(self, start: date, end: date) -> List[date]:
-        return [d for d in self._days if start <= d <= end]
+        """Eligible days — quarantined ones (data_integrity failures) are
+        excluded here so a bad-data day can never become a trade; count them
+        via quarantined_between() and REPORT the number with any results."""
+        return [d for d in self._days
+                if start <= d <= end and d not in self._quarantine]
+
+    def quarantined_between(self, start: date, end: date) -> int:
+        return sum(1 for d in self._days
+                   if start <= d <= end and d in self._quarantine)
 
     def expiry_for(self, day: date) -> Optional[date]:
         """Nearest expiry on/after ``day`` with at least ``min_dte`` days to expiry."""

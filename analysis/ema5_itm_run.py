@@ -23,10 +23,12 @@ import pandas as pd
 
 from engine.backtest import Backtest, Knobs
 from engine.data.catalog import Catalog
-from engine.data.market import MarketData
+from engine.data.market import MarketData, load_quarantine
 from engine.data.spot import SpotSeries
 from engine.execution.costs import CostModel
 from strategies.ema5_itm import Ema5Itm
+
+QUARANTINE_FILE = os.path.join(os.path.dirname(__file__), "quarantine_days.json")
 
 ROOT = "/Users/gokul/Desktop/tradealgo/data nifty "
 START = date(int(sys.argv[1]) if len(sys.argv) > 1 else 2020, 1, 1)
@@ -61,7 +63,12 @@ LOTS = int(os.environ.get("LOTS", 1))
 def run_side(side, timeframe, rr):
     cat = Catalog(ROOT)
     spot = SpotSeries.from_index(ROOT, timeframe)
-    md = MarketData(cat, spot, min_dte=3)
+    quarantine = (load_quarantine(QUARANTINE_FILE)
+                  if os.path.exists(QUARANTINE_FILE) else None)
+    md = MarketData(cat, spot, min_dte=3, quarantine=quarantine)
+    if quarantine:
+        print(f"[integrity] {md.quarantined_between(START, END)} quarantined "
+              f"day(s) excluded in {START}..{END}")
     bt = Backtest(md, CostModel(),
                   Knobs(fill_price="open", slippage_pct=0.0025,
                         timeframe=timeframe, min_volume_mult=10.0))

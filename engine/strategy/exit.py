@@ -49,6 +49,21 @@ class Exit:
                    reason=reason or trigger, fraction=fraction)
 
     @classmethod
+    def spot_at(cls, level: float, trigger: str, reason: str = "",
+                fraction: float = 1.0) -> "Exit":
+        """A resting exit keyed on the SPOT level, resolved intrabar on 1-min
+        SPOT bars: the first minute whose range crosses ``level`` recognizes
+        the exit, and the OPTION fills at the NEXT 1-min open (one minute of
+        honest latency). Replaces the bar-latency `Exit.market('spot_sl')`
+        pattern -- return it from manage() on every bar like other resting
+        exits. trigger='fall' fires when spot drops to level, 'rise' when it
+        climbs to it (direction of SPOT, regardless of option side)."""
+        if trigger not in ("fall", "rise"):
+            raise ValueError("trigger must be 'fall' (stop) or 'rise' (target)")
+        return cls(kind="spot_level", level=float(level), trigger=trigger,
+                   reason=reason or trigger, fraction=fraction)
+
+    @classmethod
     def bracket(cls, stop: float, target: float,
                 stop_reason: str = "stop", target_reason: str = "target",
                 stop_fraction: float = 1.0, target_fraction: float = 1.0) -> "Bracket":
@@ -69,15 +84,20 @@ class Bracket:
     stop_fraction: float = 1.0
     target_fraction: float = 1.0
 
-    def resolve(self, open_: float, high: float, low: float):
-        """Check one option bar; stop (fall) is checked first (conservative).
+    def resolve(self, open_: float, high: float, low: float,
+                optimistic: bool = False):
+        """Check one option bar. When both sides are inside the bar's range the
+        true intrabar order is unknowable at 1-min resolution: by default the
+        stop (fall) is checked first (pessimistic/conservative); with
+        ``optimistic=True`` the target wins the tie instead. Running a strategy
+        under both orderings brackets the truth (Knobs.intrabar).
         Returns (fill_price, reason, fraction) or (None, None, None)."""
         s_fill, s_hit = resolve_level_exit(
             Exit.at(self.stop, "fall"), open_, high, low)
-        if s_hit:
-            return s_fill, self.stop_reason, self.stop_fraction
         t_fill, t_hit = resolve_level_exit(
             Exit.at(self.target, "rise"), open_, high, low)
+        if s_hit and not (optimistic and t_hit):
+            return s_fill, self.stop_reason, self.stop_fraction
         if t_hit:
             return t_fill, self.target_reason, self.target_fraction
         return None, None, None
@@ -98,11 +118,21 @@ class TwoStage:
     entry + ``target_pts``; once the target books (the runner shrinks
     pos.qty), stage 2 trails the carried lots' premium by ``trail_gap``.
 
-    Call ``reset()`` when a new trade begins; ``exit_for(pos)`` on each
-    manage() bar. Stage detection is qty-based: the first call records the
-    full size, any smaller qty means the scale-out booked. ``scaled(pos)``
-    exposes the stage for strategies with extra stage-1 exits.
+    Call ``reset()`` when a new trade begins. Two usage modes:
+    - legacy (bar-granular handoff): manage() returns ``exit_for(pos)`` —
+      the trail takes over on the NEXT strategy bar after the scale-out.
+      ``scaled(pos)`` exposes the stage for strategies with extra stage-1
+      exits. This is what the validated cpr_breakout config uses.
+    - engine-owned (in-window handoff): manage() returns the policy object
+      itself (kind='two_stage') — the runner transitions to the trail on
+      the very next 1-min bar after the scale-out, seeding the trail peak
+      at the scale-out fill. Higher fidelity; re-validate a strategy's
+      recorded numbers before switching it over.
+
+    Stage detection is qty-based: the first call records the full size,
+    any smaller qty means the scale-out booked.
     """
+    kind = "two_stage"                 # runner dispatch when returned from manage()
     NO_STOP = float("-inf")            # unreachable stop when no loss-cap is set
 
     def __init__(self, target_pts: float, trail_gap: float, fraction: float,

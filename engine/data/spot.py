@@ -65,11 +65,16 @@ def _normalize_naive_ist(dt: pd.Series) -> pd.Series:
 
 
 class SpotSeries:
-    def __init__(self, df: pd.DataFrame):
-        # one row per minute; columns DateTime, Open, High, Low, Close
+    def __init__(self, df: pd.DataFrame, one_min: Optional[pd.DataFrame] = None):
+        # one row per bar; columns DateTime, Open, High, Low, Close
         self._df = df.sort_values("DateTime").reset_index(drop=True)
         # O(1) bar lookup (the per-bar hot path) instead of scanning the frame
         self._pos = {ts: i for i, ts in enumerate(self._df["DateTime"])}
+        # the pre-resample 1-min frame, kept for intrabar spot-exit resolution
+        # (None when the series was built directly from 1-min rows -- then
+        # minute_window falls back to self._df, which already IS minutes)
+        self._df1m = (one_min.sort_values("DateTime").reset_index(drop=True)
+                      if one_min is not None else None)
 
     @classmethod
     def from_index(cls, root: str, timeframe: str = "5min", label: str = "left") -> "SpotSeries":
@@ -90,7 +95,7 @@ class SpotSeries:
             frames.append(df)
         one_min = (pd.concat(frames, ignore_index=True)
                    .drop_duplicates("DateTime").sort_values("DateTime"))
-        return cls(_resample_ohlc(one_min, timeframe, label))
+        return cls(_resample_ohlc(one_min, timeframe, label), one_min=one_min)
 
     def _row_to_bar(self, row) -> SpotBar:
         return SpotBar(dt=row["DateTime"].to_pydatetime(),
@@ -142,3 +147,12 @@ class SpotSeries:
         """All bars with timestamp <= ``dt`` (no future bars)."""
         prior = self._df[self._df["DateTime"] <= pd.Timestamp(dt)]
         return [self._row_to_bar(r) for _, r in prior.iterrows()]
+
+    def minute_window(self, start: datetime, end: datetime) -> List[SpotBar]:
+        """1-min spot bars in [start, end) -- for intrabar spot-exit resolution.
+        Uses the retained pre-resample frame; falls back to self._df when the
+        series was constructed from 1-min rows directly. O(log n) slice."""
+        df = self._df1m if self._df1m is not None else self._df
+        lo = int(df["DateTime"].searchsorted(pd.Timestamp(start), side="left"))
+        hi = int(df["DateTime"].searchsorted(pd.Timestamp(end), side="left"))
+        return [self._row_to_bar(df.iloc[j]) for j in range(lo, hi)]

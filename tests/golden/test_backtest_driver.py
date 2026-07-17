@@ -17,7 +17,7 @@ from engine.execution.costs import CostModel
 from engine.execution.model import Order
 from engine.strategy.base import Strategy
 from engine.instruments import lot_size_for
-from engine.backtest import Backtest
+from engine.backtest import Backtest, Knobs
 
 
 def _spot_5min(days):
@@ -146,6 +146,103 @@ def test_premium_trail_exits_20_off_the_peak():
     assert res.trades[0].reason == "ptrail" and res.trades[0].exit == pytest.approx(110.0)
 
 
+class BuyThenMarketExit(Strategy):
+    def on_day_start(self, ctx):
+        self._in, self._n = False, 0
+
+    def on_bar(self, ctx):
+        if not self._in:
+            self._in = True
+            return [Order(side="CALL", strike=20000, lots=1)]
+        return []
+
+    def manage(self, ctx, pos):
+        from engine.strategy.exit import Exit
+        return Exit.market("out")
+
+
+def _slip_tape(entry_vol=5000, exit_vol=5000):
+    d1 = date(2024, 1, 2)
+    spot = _spot_5min([d1])
+    bars = {15: dict(call_open=100.0, call_vol=entry_vol),                    # signal bar (volume gate)
+            20: dict(call_open=100.0, call_vol=entry_vol),                    # flat entry bar
+            25: dict(call_open=110.0, call_high=121.0, call_low=99.0,        # ranging exit bar
+                     call_close=111.0, call_vol=exit_vol)}
+    rows = [make_row(datetime(2024, 1, 2, 9, m), 20000, **kw) for m, kw in bars.items()]
+    return d1, spot, Chain(pd.DataFrame(rows, columns=CHAIN_COLUMNS))
+
+
+def test_range_scaled_slippage_charges_fast_bars_more():
+    # exit bar mid=(121+99)/2=110, range 22 -> extra slip = 0.05*22/110 = 0.01;
+    # entry bar is flat (range 0) -> entry stays at the raw 100
+    d1, spot, chain = _slip_tape()
+    res = Backtest(FakeMarket(spot, [(date(2024, 1, 11), {d1: chain})]), CostModel(),
+                   Knobs(slippage_range_k=0.05)).run(BuyThenMarketExit(), d1, d1)
+    assert res.trades[0].entry == pytest.approx(100.0)
+    assert res.trades[0].exit == pytest.approx(110.0 * (1 - 0.01))
+
+
+def test_thin_exit_penalty_multiplies_slip_when_volume_cant_absorb_qty():
+    # exit-bar volume 50 < min_volume_mult(1.0) * qty(75, the full lot) -> slip
+    # doubles; a liquid exit bar keeps the base slip
+    d1, spot, chain = _slip_tape(exit_vol=50)
+    knobs = Knobs(slippage_pct=0.01, min_volume_mult=1.0, thin_exit_mult=2.0)
+    res = Backtest(FakeMarket(spot, [(date(2024, 1, 11), {d1: chain})]), CostModel(),
+                   knobs).run(BuyThenMarketExit(), d1, d1)
+    assert res.trades[0].exit == pytest.approx(110.0 * (1 - 0.02))
+
+    d1, spot, chain = _slip_tape(exit_vol=5000)
+    res = Backtest(FakeMarket(spot, [(date(2024, 1, 11), {d1: chain})]), CostModel(),
+                   knobs).run(BuyThenMarketExit(), d1, d1)
+    assert res.trades[0].exit == pytest.approx(110.0 * (1 - 0.01))
+
+
+class BuyThenSpotStop(Strategy):
+    def on_day_start(self, ctx):
+        self._in = False
+
+    def on_bar(self, ctx):
+        if not self._in:
+            self._in = True
+            return [Order(side="CALL", strike=20000, lots=1)]
+        return []
+
+    def manage(self, ctx, pos):
+        from engine.strategy.exit import Exit
+        return Exit.spot_at(19980, "fall", "spot_sl")
+
+
+def test_spot_level_exit_resolves_on_1min_spot_with_1min_latency():
+    # spot crosses 19980 on the 9:21 1-min bar (inside the 9:20 strategy bar);
+    # the option fills at the NEXT 1-min open, 9:22 -> 97. The old
+    # Exit.market('spot_sl') pattern would have waited for the 9:25 bar.
+    d1 = date(2024, 1, 2)
+    five = pd.DataFrame(
+        [(datetime(2024, 1, 2, 9, 15), 20000.0, 20000.0, 20000.0, 20000.0),
+         (datetime(2024, 1, 2, 9, 20), 20000.0, 20000.0, 19960.0, 19990.0)],
+        columns=["DateTime", "Open", "High", "Low", "Close"])
+    one = pd.DataFrame(
+        [(datetime(2024, 1, 2, 9, 15), 20000.0, 20000.0, 20000.0, 20000.0),
+         (datetime(2024, 1, 2, 9, 20), 20000.0, 20000.0, 19995.0, 19998.0),
+         (datetime(2024, 1, 2, 9, 21), 19998.0, 19998.0, 19960.0, 19970.0),
+         (datetime(2024, 1, 2, 9, 22), 19970.0, 19992.0, 19968.0, 19990.0)],
+        columns=["DateTime", "Open", "High", "Low", "Close"])
+    spot = SpotSeries(five, one_min=one)
+    bars = {20: (100, 100, 100, 100),       # entry fill
+            21: (98, 99, 95, 96),
+            22: (97, 98, 94, 95),           # exit fill at this bar's open
+            25: (96, 97, 95, 96)}
+    rows = [make_row(datetime(2024, 1, 2, 9, m), 20000, call_open=o, call_high=h,
+                     call_low=l, call_close=c) for m, (o, h, l, c) in bars.items()]
+    chain = Chain(pd.DataFrame(rows, columns=CHAIN_COLUMNS))
+    res = Backtest(FakeMarket(spot, [(date(2024, 1, 11), {d1: chain})]),
+                   CostModel()).run(BuyThenSpotStop(), d1, d1)
+    assert len(res.trades) == 1
+    assert res.trades[0].reason == "spot_sl"
+    assert res.trades[0].exit == pytest.approx(97.0)
+    assert res.trades[0].exit_dt.minute == 22
+
+
 class BuyThenArmedTrail(Strategy):
     def __init__(self, arm):
         self._arm = arm
@@ -162,6 +259,35 @@ class BuyThenArmedTrail(Strategy):
     def manage(self, ctx, pos):
         from engine.strategy.exit import Exit
         return Exit.trail(20, "ptrail", arm=self._arm)
+
+
+def test_intrabar_band_trail_pessimistic_vs_optimistic():
+    # bar 25 spans BOTH a new peak (130) and a would-be trail stop: the mixed/
+    # optimistic reading folds the high first (stop 110, low 105 -> exit 110);
+    # the pessimistic reading checks the low against the PRIOR peak 100 first
+    # (stop 80 -> survives), folds 130 in after, and exits next bar at its
+    # open 108 (open < stop 110 -> worse open). The spread IS the error band.
+    d1 = date(2024, 1, 2)
+    spot = SpotSeries(pd.DataFrame(
+        [(datetime(2024, 1, 2, 9, m), 100.0, 100.0, 100.0, 100.0) for m in (15, 20, 25, 30)],
+        columns=["DateTime", "Open", "High", "Low", "Close"]))
+    bars = {20: (100, 100, 100, 100),
+            25: (110, 130, 105, 128),       # high 130 and low 105 in ONE bar
+            30: (108, 112, 106, 108),
+            35: (108, 109, 107, 108)}
+    rows = [make_row(datetime(2024, 1, 2, 9, m), 20000, call_open=o, call_high=h,
+                     call_low=l, call_close=c) for m, (o, h, l, c) in bars.items()]
+    chain = Chain(pd.DataFrame(rows, columns=CHAIN_COLUMNS))
+    market = lambda: FakeMarket(spot, [(date(2024, 1, 11), {d1: chain})])
+
+    res = Backtest(market(), CostModel(),
+                   Knobs(intrabar="optimistic")).run(BuyThenPremiumTrail(), d1, d1)
+    assert res.trades[0].reason == "ptrail" and res.trades[0].exit == pytest.approx(110.0)
+
+    res = Backtest(market(), CostModel(),
+                   Knobs(intrabar="pessimistic")).run(BuyThenPremiumTrail(), d1, d1)
+    assert res.trades[0].reason == "ptrail" and res.trades[0].exit == pytest.approx(108.0)
+    assert res.trades[0].exit_dt.minute == 30       # survives bar 25, dies next bar
 
 
 def test_armed_trail_dormant_until_peak_reaches_arm_level():
@@ -280,6 +406,71 @@ def test_bracket_scale_out_then_trail_remainder():
     assert [t.reason for t in res.trades] == ["scale", "ptrail"]
     assert res.trades[0].exit == pytest.approx(125.0)
     assert res.trades[1].exit == pytest.approx(105.0)
+    assert all(t.qty == pytest.approx(full / 2) for t in res.trades)
+
+
+class SellNakedCall(Strategy):
+    def on_day_start(self, ctx):
+        self._in = False
+
+    def on_bar(self, ctx):
+        if not self._in:
+            self._in = True
+            return [Order(action="sell", side="CALL", strike=20000, lots=1)]
+        return []
+
+
+def test_naked_short_legs_are_refused():
+    # net-short exposure isn't modeled (margin/assignment) -> loud error,
+    # not silently wrong numbers; covered verticals stay allowed (orb_spread)
+    d1 = date(2024, 1, 2)
+    spot = _spot_5min([d1])
+    batches = [(date(2024, 1, 11), {d1: _day_chain(d1, 100, 120)})]
+    with pytest.raises(ValueError, match="naked short"):
+        Backtest(FakeMarket(spot, batches), CostModel()).run(SellNakedCall(), d1, d1)
+
+
+class BuyThenTwoStagePolicy(Strategy):
+    """manage() returns the TwoStage policy itself -> engine-owned in-window handoff."""
+    def on_day_start(self, ctx):
+        from engine.strategy.exit import TwoStage
+        self._in = False
+        self._pol = TwoStage(target_pts=25, trail_gap=20, fraction=0.5, stop_pts=12)
+
+    def on_bar(self, ctx):
+        if not self._in:
+            self._in = True
+            return [Order(side="CALL", strike=20000, lots=1)]
+        return []
+
+    def manage(self, ctx, pos):
+        return self._pol
+
+
+def test_two_stage_policy_hands_off_to_trail_in_the_same_window():
+    # entry 100 -> target 125 books half on the 9:21 bar; the ENGINE-owned
+    # policy starts trailing the remainder on the very next 1-min bar with the
+    # peak seeded at the scale-out fill: 9:22 peak 125 -> stop 105, low 104
+    # breaches -> rest out at 105 in the SAME strategy bar. (The legacy
+    # exit_for() path would have waited for the next 5-min bar.)
+    d1 = date(2024, 1, 2)
+    spot = SpotSeries(pd.DataFrame(
+        [(datetime(2024, 1, 2, 9, m), 100.0, 100.0, 100.0, 100.0) for m in (15, 20, 25)],
+        columns=["DateTime", "Open", "High", "Low", "Close"]))
+    bars = {20: (100, 100, 100, 100),
+            21: (110, 130, 120, 128),       # target 125 books half
+            22: (118, 125, 104, 108),       # trail: stop 125-20=105, low 104 -> out at 105
+            25: (108, 109, 107, 108)}
+    rows = [make_row(datetime(2024, 1, 2, 9, m), 20000, call_open=o, call_high=h,
+                     call_low=l, call_close=c) for m, (o, h, l, c) in bars.items()]
+    chain = Chain(pd.DataFrame(rows, columns=CHAIN_COLUMNS))
+    res = Backtest(FakeMarket(spot, [(date(2024, 1, 11), {d1: chain})]),
+                   CostModel()).run(BuyThenTwoStagePolicy(), d1, d1)
+    full = lot_size_for(d1)
+    assert [t.reason for t in res.trades] == ["book", "ptrail"]
+    assert res.trades[0].exit == pytest.approx(125.0)
+    assert res.trades[1].exit == pytest.approx(105.0)
+    assert res.trades[0].exit_dt.minute == 21 and res.trades[1].exit_dt.minute == 22
     assert all(t.qty == pytest.approx(full / 2) for t in res.trades)
 
 

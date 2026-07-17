@@ -50,3 +50,21 @@ def test_trading_days_from_spot_in_range():
     md = MarketData(cat, _spot(days), min_dte=3)
     got = md.trading_days(date(2024, 1, 2), date(2024, 1, 5))
     assert got == [date(2024, 1, 2), date(2024, 1, 5)]
+
+
+def test_quarantined_days_are_skipped_and_counted():
+    cat = FakeCatalog(["2024-01-31"])
+    days = [date(2024, 1, 1), date(2024, 1, 2), date(2024, 1, 5), date(2024, 1, 10)]
+    md = MarketData(cat, _spot(days), min_dte=3, quarantine={date(2024, 1, 2)})
+    assert md.trading_days(date(2024, 1, 1), date(2024, 1, 10)) == \
+        [date(2024, 1, 1), date(2024, 1, 5), date(2024, 1, 10)]
+    assert md.quarantined_between(date(2024, 1, 1), date(2024, 1, 10)) == 1
+    assert md.quarantined_between(date(2024, 1, 3), date(2024, 1, 10)) == 0
+
+
+def test_load_quarantine_roundtrip(tmp_path):
+    import json
+    from engine.data.market import load_quarantine
+    p = tmp_path / "q.json"
+    p.write_text(json.dumps({"quarantined": ["2024-01-02", "2024-03-05"]}))
+    assert load_quarantine(str(p)) == {date(2024, 1, 2), date(2024, 3, 5)}
