@@ -39,6 +39,12 @@ period 2020-01-01..2026-02-25  (6.2y)   trade-days 280   ~46/yr
    p90 outlay (1-pos)   Rs     128,570
    ring-fence (cap+DD)  Rs     251,487   ->  ROC 48%/yr
 
+ COSTS (brokerage+STT+exchange+SEBI+stamp+GST; excl. the 0.25% slip)
+   total costs          Rs      69,441
+   avg / trade-day      Rs         248
+   avg / leg            Rs         181   (384 legs)
+   costs vs gross P&L             9%  (gross Rs814,265 -> net Rs744,824)
+
  YEAR-BY-YEAR
    yr     days       net Rs  win%    maxDD Rs
    2020     12      -27,053   50%     -35,719
@@ -87,6 +93,12 @@ period 2020-01-03..2026-02-25  (6.1y)   trade-days 207   ~34/yr
    median outlay/trade  Rs      88,601
    p90 outlay (1-pos)   Rs     122,986
    ring-fence (cap+DD)  Rs     219,018   ->  ROC 65%/yr
+
+ COSTS (brokerage+STT+exchange+SEBI+stamp+GST; excl. the 0.25% slip)
+   total costs          Rs      50,351
+   avg / trade-day      Rs         243
+   avg / leg            Rs         170   (296 legs)
+   costs vs gross P&L             5%  (gross Rs918,875 -> net Rs868,525)
 
  YEAR-BY-YEAR
    yr     days       net Rs  win%    maxDD Rs

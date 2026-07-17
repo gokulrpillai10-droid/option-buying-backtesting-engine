@@ -53,10 +53,12 @@ print("Running deployed CPR config (book4/trail2/+50/far/IV<=0.12, slip 0.25%) .
 res = bt.run(Rec(book_prem=50, book_lots=4, trail_prem=12, stop_mode="far",
                  stop_prem=None, max_iv=0.12), START, END)
 
-tr = pd.DataFrame([{"date": pd.Timestamp(t.date), "net": t.net, "entry": t.entry, "qty": t.qty}
+tr = pd.DataFrame([{"date": pd.Timestamp(t.date), "net": t.net, "entry": t.entry,
+                    "qty": t.qty, "cost": t.cost}
                    for t in res.trades])
 tr["outlay"] = tr.entry * tr.qty
-day = tr.groupby("date").agg(net=("net", "sum"), outlay=("outlay", "sum")).reset_index()
+day = tr.groupby("date").agg(net=("net", "sum"), outlay=("outlay", "sum"),
+                             cost=("cost", "sum")).reset_index()
 ev = pd.DataFrame(ENTRY_VOL).drop_duplicates("date")
 ev["req"] = ev.lots * ev.date.dt.date.map(lot_size_for)
 ev["vmult"] = ev.evol / ev.req
@@ -132,6 +134,13 @@ def tearsheet(d, title):
     print(f"   median outlay/trade  Rs{d.outlay.median():>12,.0f}")
     print(f"   p90 outlay (1-pos)   Rs{cap:>12,.0f}")
     print(f"   ring-fence (cap+DD)  Rs{ringfence:>12,.0f}   ->  ROC {ann/ringfence*100:.0f}%/yr")
+    gross = d.net.sum() + d.cost.sum()                # engine net is after costs
+    print(f"\n COSTS (brokerage+STT+exchange+SEBI+stamp+GST; excl. the 0.25% slip)")
+    print(f"   total costs          Rs{d.cost.sum():>12,.0f}")
+    print(f"   avg / trade-day      Rs{d.cost.mean():>12,.0f}")
+    print(f"   avg / leg            Rs{legs.cost.mean():>12,.0f}   ({len(legs)} legs)")
+    print(f"   costs vs gross P&L    {d.cost.sum()/gross*100 if gross else 0:>10.0f}%  "
+          f"(gross Rs{gross:,.0f} -> net Rs{d.net.sum():,.0f})")
     print(f"\n YEAR-BY-YEAR")
     print(f"   {'yr':<6}{'days':>5}{'net Rs':>13}{'win%':>6}{'maxDD Rs':>12}")
     for y, g in d.groupby("yr"):
