@@ -93,5 +93,4 @@ def combined_state(labels):
 
 def lagged(labels):
     """Executable view: what a trader knows at today's open = yesterday's labels."""
-    result = labels.shift(1)
-    return result.fillna(False).astype(bool)
+    return labels.shift(1, fill_value=False)
