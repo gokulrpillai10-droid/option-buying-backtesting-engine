@@ -22,6 +22,24 @@
 
 ### Task 1: Labeler core (`persistence`, `label_regimes`)
 
+> **AMENDMENT 2026-07-18 (supersedes the trend-axis code below).** The first real-data
+> run proved the notebook's relative trend axis is mean-reverting (labeled 25% of the
+> 2023-24 rally as bear). The **volatility axis stays exactly as coded below** (relative
+> vol z-score + zero-std guard). The **trend axis is replaced by an absolute gate**:
+> - add `ma_win: int = 200`, `slope_win: int = 20` params to `label_regimes`.
+> - `ma = closes.rolling(ma_win).mean()`; `rising = ma > ma.shift(slope_win)`.
+> - `r["bull"] = (closes > ma) & rising`; `r["bear"] = (closes < ma) & ~rising & ma.notna()`.
+>   (neutral = neither; do NOT z-score the trend.)
+> - warm-up truncation is now governed by the MA200 window: first row where BOTH
+>   `ma.notna()` and the vol-z baseline are valid (≈ max(ma_win, lookback+z_win) → ~200 rows).
+> - Trend TESTS change: `test_rally_after_flat_labels_bull` / `test_crash_..._bear` must use
+>   series where price crosses its own MA200 (a rising ramp above MA = bull; a sustained
+>   decline below a falling MA = bear). Keep the persistence, warm-up, zero-std, and vol tests.
+> - Sanity thresholds (Task 3): the 2023-24 bull arm becomes a REAL pass criterion
+>   (`stable_bull` dominant, `stable_bear` ≤ ~5%). See spec "Directional redesign".
+> The Step 1-4 code blocks below are the pre-amendment version; follow the amendment for
+> the trend axis and keep everything else.
+
 **Files:**
 - Create: `analysis/regime_finder.py`
 - Test: `tests/unit/test_regime_finder.py`

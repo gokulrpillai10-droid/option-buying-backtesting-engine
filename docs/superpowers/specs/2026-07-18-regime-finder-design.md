@@ -25,15 +25,42 @@ and it carries one known-bad row (2023-03-01 close 1,702 — the engine integrit
 vs spot basis), sole exception the bad row above. Starting 2019 absorbs the warm-up
 before COVID and extends the calendar to the present.
 
-**Labeler (inlined ~60 lines, ported from notebook cell 19 with fixes):**
-- 20-day trend (`pct_change(20)`) and 20-day rolling vol of daily returns.
-- Both z-scored against a 90-day rolling baseline; thresholds ±0.5.
-- Raw labels: Bull / Bear (trend z), High_Vol / Low_Vol (vol z).
-- Stable labels: raw condition true today AND ≥4 of last 5 days (persistence filter).
-- **Fix 1:** explicit warm-up truncation (first ~110 rows dropped; the notebook's
-  `dropna()` was a silent no-op on int columns). Warm-up is absorbed by 2020 data.
-- **Fix 2:** zero-std guard on both z-scores (flat stretches must not produce inf labels).
+**Labeler — two axes, each defined by what it does well (REVISED 2026-07-18 after
+the first real-data run, see "Directional redesign" below):**
+
+- **Volatility axis (high_vol / low_vol) — relative, kept from the notebook.**
+  20-day rolling vol of daily returns, z-scored against a 90-day rolling baseline,
+  thresholds ±0.5. This axis is realistic as-is: it cleanly caught COVID (73% high_vol),
+  the 2021 top, and the 2022 corrections. Vol genuinely IS a relative concept.
+  - Fix A: zero-std guard on the z-score (flat stretches must not produce inf labels).
+
+- **Direction axis (bull / bear) — ABSOLUTE, price vs 200-day MA + slope.**
+  `bull = close > MA200 AND MA200 rising` (slope over ~20d > 0);
+  `bear = close < MA200 AND MA200 falling`; otherwise neutral/transition.
+  Replaces the notebook's relative trend z-score, which was mean-reverting and
+  labeled ~25% of the 2023-24 rally as "bear" (see redesign note). The absolute
+  gate is Layer 1 — the standard directional regime filter — and needs no new data.
+
+- **Stable labels:** raw condition true today AND ≥4 of last 5 days (persistence filter),
+  applied to bull, bear, low_vol.
+- **Warm-up:** explicit truncation (the notebook's `dropna()` was a no-op on int cols).
+  Now governed by the 200-day MA → labeling begins ~2019-10 (was ~2019-06). Immaterial.
 - `lagged` view: labels shifted +1 day = what a live trader could act on (decision 1B).
+
+### Directional redesign (2026-07-18) — why the trend axis changed
+
+The first real-data run (Task 3) SANITY-FAILED the bull arm: the notebook's relative
+trend definition (20d trend z-scored vs its own rolling 90d baseline) is mean-reverting,
+so a steady rally never reads as persistent bull — every interim pause looks weak
+*relative to the rally's own hot baseline* and stamps as bear. Measured: 2023-24 rally
+(NIFTY +42%) showed stable_bull 27% but stable_bear 25%. Routing long exposure on that
+"bear" label would de-risk repeatedly through a historic bull run — fatal to the thesis.
+
+Empirical fix, validated before adopting: price vs 200-day MA recovers known history —
+2023-24 rally 100% above a rising MA200 (0% bear), COVID 91% below MA200, 2022 correction
+52% below (genuinely mixed). Decision: replace the trend axis with the absolute MA200+slope
+gate; keep the relative vol axis. This makes the labeler an improved variant, not a faithful
+port — the right call, since accuracy beats fidelity to a half-broken definition.
 
 **Output (`regime_finder_out.txt`):**
 1. **Regime calendar** — contiguous episodes: regime, start, end, duration in trading days.
