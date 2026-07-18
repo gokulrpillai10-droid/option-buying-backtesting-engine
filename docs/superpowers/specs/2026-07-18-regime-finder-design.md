@@ -17,7 +17,13 @@ existed before spending effort on P&L attribution.
 One throwaway-grade analysis script, repo convention (committed with `_out.txt`).
 No engine changes, no tearsheet changes, no new modules.
 
-**Input:** `analysis/daily_underlying.csv` (NIFTY daily OHLC 2020-01 → 2026-02, 1,522 rows).
+**Input:** `analysis/nifty_daily.csv` (^NSEI spot daily OHLC 2019-01 → present, 1,859 rows,
+fetched 2026-07-18). NOT `daily_underlying.csv`: that file starts 2020-01, which puts the
+COVID crash inside the labeler's ~110-day warm-up (labels would only begin 2020-06-15),
+and it carries one known-bad row (2023-03-01 close 1,702 — the engine integrity gate's
+1/1517). Cross-checked on 1,518 overlap days: agreement within ~0.5% (options-derived
+vs spot basis), sole exception the bad row above. Starting 2019 absorbs the warm-up
+before COVID and extends the calendar to the present.
 
 **Labeler (inlined ~60 lines, ported from notebook cell 19 with fixes):**
 - 20-day trend (`pct_change(20)`) and 20-day rolling vol of daily returns.
