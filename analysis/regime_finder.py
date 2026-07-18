@@ -67,3 +67,31 @@ def label_regimes(closes, lookback=20, z_win=90, z_thresh=0.5,
                       ("stable_low_vol", "low_vol")]:
         r[name] = persistence(r[col], persist_need, persist_win)
     return r.loc[warm_ok[warm_ok].index[0]:].astype(bool)
+
+
+def episodes(mask):
+    """Contiguous True runs of a bool Series -> [(start, end, days), ...]."""
+    mask = mask.astype(bool)
+    out = []
+    run_id = (mask != mask.shift()).cumsum()
+    for _, seg in mask.groupby(run_id):
+        if seg.iloc[0]:
+            out.append((seg.index[0], seg.index[-1], len(seg)))
+    return out
+
+
+def combined_state(labels):
+    """One exclusive state per day; high-vol beats low-vol (notebook priority)."""
+    s = pd.Series("Neutral", index=labels.index)
+    s[labels["high_vol"] & labels["stable_bear"]] = "HighVol_Bear"
+    s[labels["high_vol"] & labels["stable_bull"]] = "HighVol_Bull"
+    free = s == "Neutral"
+    s[free & labels["stable_low_vol"] & labels["stable_bear"]] = "LowVol_Bear"
+    s[free & labels["stable_low_vol"] & labels["stable_bull"]] = "LowVol_Bull"
+    return s
+
+
+def lagged(labels):
+    """Executable view: what a trader knows at today's open = yesterday's labels."""
+    result = labels.shift(1)
+    return result.fillna(False).astype(bool)

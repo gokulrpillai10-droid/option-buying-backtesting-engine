@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from analysis.regime_finder import persistence, label_regimes
+from analysis.regime_finder import persistence, label_regimes, episodes, combined_state, lagged
 
 IDX = lambda n: pd.date_range("2019-01-01", periods=n, freq="B")
 
@@ -83,3 +83,38 @@ def test_vol_spike_alone_labels_high_vol():
     closes = make_closes(drift=0.0, vol=0.025)
     labels = label_regimes(closes)
     assert labels.iloc[-60:]["high_vol"].sum() > 0
+
+
+def test_episodes_finds_contiguous_runs():
+    mask = _series([False, True, True, False, True]).astype(bool)
+    eps = episodes(mask)
+    assert len(eps) == 2
+    (s1, e1, d1), (s2, e2, d2) = eps
+    assert (s1, e1, d1) == (mask.index[1], mask.index[2], 2)
+    assert (s2, e2, d2) == (mask.index[4], mask.index[4], 1)
+
+
+def test_episodes_empty_mask():
+    assert episodes(_series([False, False]).astype(bool)) == []
+
+
+def test_combined_state_priority_high_vol_wins():
+    labels = pd.DataFrame(
+        {
+            "high_vol": [True, False, False, False],
+            "stable_low_vol": [True, True, True, False],
+            "stable_bull": [True, True, False, False],
+            "stable_bear": [False, False, True, False],
+        },
+        index=IDX(4),
+    )
+    s = combined_state(labels)
+    assert list(s) == ["HighVol_Bull", "LowVol_Bull", "LowVol_Bear", "Neutral"]
+
+
+def test_lagged_shifts_one_day():
+    labels = label_regimes(make_closes(drift=-0.008, vol=0.02))
+    lag = lagged(labels)
+    assert not lag.iloc[0].any()  # day one: nothing known yet
+    assert (lag["bear"].iloc[1:].values == labels["bear"].iloc[:-1].values).all()
+    assert lag.dtypes.eq(bool).all()
