@@ -148,6 +148,22 @@ def test_combined_state_priority_high_vol_wins():
     assert list(s) == ["HighVol_Bull", "LowVol_Bull", "LowVol_Bear", "Neutral"]
 
 
+def test_combined_state_high_vol_without_stable_direction_is_neutral():
+    # high_vol raw but no stable bull/bear -> not a HighVol_* state; and the
+    # LowVol arms require stable_low_vol, which a high_vol day doesn't have ->
+    # falls through to Neutral. Exercises the `free`-guard fallthrough branch.
+    labels = pd.DataFrame(
+        {
+            "high_vol": [True, False],
+            "stable_low_vol": [False, False],
+            "stable_bull": [False, False],
+            "stable_bear": [False, False],
+        },
+        index=IDX(2),
+    )
+    assert list(combined_state(labels)) == ["Neutral", "Neutral"]
+
+
 def test_lagged_shifts_one_day():
     labels = label_regimes(make_closes(drift=-0.008, vol=0.02))
     lag = lagged(labels)

@@ -96,7 +96,16 @@ def episodes(mask):
 
 
 def combined_state(labels):
-    """One exclusive state per day; high-vol beats low-vol (notebook priority)."""
+    """One exclusive state per day; high-vol beats low-vol (notebook priority).
+
+    The vol axis is intentionally ASYMMETRIC: high-vol arms gate on RAW
+    ``high_vol`` (react fast to danger), low-vol arms gate on persistence-
+    filtered ``stable_low_vol`` (confirm calm slowly). A high_vol day without a
+    stable direction, or with no vol extreme at all, falls through to Neutral.
+    Raw-high and stable-low are mutually exclusive on the data (a day cannot be
+    both a vol spike and stably calm), so the two branches never contend; the
+    asymmetry is about reaction speed, not a tie-break.
+    """
     s = pd.Series("Neutral", index=labels.index)
     s[labels["high_vol"] & labels["stable_bear"]] = "HighVol_Bear"
     s[labels["high_vol"] & labels["stable_bull"]] = "HighVol_Bull"
