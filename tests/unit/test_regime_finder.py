@@ -1,9 +1,11 @@
 """Unit tests for the regime labeler (analysis/regime_finder.py).
 
-Synthetic-series design: the labels are z-scores RELATIVE to a 90-day
-baseline, so a steady trend scores z~0. To force a label, a series must
-CHANGE character: flat-then-rally -> bull, flat-then-crash -> bear,
-quiet-then-wild -> high_vol.
+Synthetic-series design: vol labels are z-scores RELATIVE to a 90-day
+baseline, so quiet-then-wild triggers high_vol. Trend labels (bull/bear)
+are an ABSOLUTE gate: price vs its own 200-day MA + MA slope. To force a
+trend label, a series must actually cross its rolling MA200 and hold
+there long enough for the MA to turn — a short flat-then-move segment is
+not enough; the move must be long/steep enough to pull the MA itself.
 """
 import numpy as np
 import pandas as pd
@@ -47,9 +49,9 @@ def test_persistence_requires_today_true():
 def test_warmup_truncated():
     closes = make_closes()
     labels = label_regimes(closes)
-    # first valid row needs lookback (20) + z_win (90) observations
-    assert labels.index[0] >= closes.index[109]
-    assert labels.index[0] <= closes.index[130]  # not over-truncated
+    # first valid row now needs ma_win (200) observations (dominates lookback+z_win)
+    assert labels.index[0] >= closes.index[198]
+    assert labels.index[0] <= closes.index[215]  # not over-truncated
     assert labels.notna().all().all()
 
 
@@ -60,23 +62,41 @@ def test_flat_series_no_crash_no_labels():
     assert labels.dtypes.eq(bool).all()
 
 
-def test_rally_after_flat_labels_bull():
-    closes = make_closes(drift=0.006, vol=0.004)
+def test_rising_ramp_labels_bull():
+    # 400 pts, steadily rising ~0.05%/day + tiny noise -> price pulls away
+    # above its own rising MA200 well before the series ends.
+    n = 400
+    rng = np.random.default_rng(11)
+    rets = 0.0005 + rng.normal(0.0, 0.0005, n)
+    closes = _series(100.0 * np.cumprod(1.0 + rets))
     labels = label_regimes(closes)
-    move = labels.iloc[-60:]  # inside the rally segment
+    move = labels.iloc[-60:]  # well after MA200 has turned up
     assert move["bull"].sum() > 0
     assert move["stable_bull"].sum() > 0
     assert move["stable_bear"].sum() == 0
 
 
-def test_crash_after_flat_labels_bear_and_high_vol():
+def test_sustained_decline_labels_bear():
+    # rise for 250 days (builds a rising MA200), then decline for 200 days
+    # -- long/steep enough for price to cross under the MA and for the
+    # MA itself to roll over and start falling.
+    rng = np.random.default_rng(13)
+    up = 0.0006 + rng.normal(0.0, 0.0005, 250)
+    down = -0.0012 + rng.normal(0.0, 0.001, 200)
+    rets = np.concatenate([up, down])
+    closes = _series(100.0 * np.cumprod(1.0 + rets))
+    labels = label_regimes(closes)
+    move = labels.iloc[-60:]  # deep into the decline segment
+    assert move["bear"].sum() > 0
+    assert move["stable_bear"].sum() > 0
+    assert move["stable_bull"].sum() == 0
+
+
+def test_crash_labels_high_vol():
     closes = make_closes(drift=-0.008, vol=0.02)
     labels = label_regimes(closes)
     move = labels.iloc[-60:]
-    assert move["bear"].sum() > 0
-    assert move["stable_bear"].sum() > 0
     assert move["high_vol"].sum() > 0
-    assert move["stable_bull"].sum() == 0
 
 
 def test_vol_spike_alone_labels_high_vol():

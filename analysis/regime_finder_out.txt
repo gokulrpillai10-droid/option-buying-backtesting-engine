@@ -1,0 +1,91 @@
+NIFTY REGIME FINDER — labeled 1660 days 2019-10-31 .. 2026-07-17 (input analysis/nifty_daily.csv, 1859 rows)
+
+DAYS & EPISODES per label
+label             days  episodes  longest
+bull              1095        19      397
+bear               206         6       85
+high_vol           499        33       65
+low_vol            714        49       80
+stable_bull       1059        15      394
+stable_bear        192         4       82
+stable_low_vol     614        33       77
+
+COMBINED-STATE day counts: {'Neutral': 824, 'LowVol_Bull': 374, 'HighVol_Bull': 309, 'LowVol_Bear': 94, 'HighVol_Bear': 59}
+
+REGIME CALENDAR (non-Neutral combined-state runs of >=3 days)
+  2019-12-04 .. 2020-01-06    23d  LowVol_Bull
+  2020-02-18 .. 2020-02-25     5d  HighVol_Bull
+  2020-03-17 .. 2020-05-05    31d  HighVol_Bear
+  2020-06-05 .. 2020-07-16    30d  LowVol_Bear
+  2020-12-01 .. 2020-12-18    14d  LowVol_Bull
+  2021-02-01 .. 2021-03-26    39d  HighVol_Bull
+  2021-04-12 .. 2021-04-27    10d  HighVol_Bull
+  2021-05-18 .. 2021-08-13    63d  LowVol_Bull
+  2021-08-17 .. 2021-09-17    22d  LowVol_Bull
+  2021-10-05 .. 2022-01-04    63d  HighVol_Bull
+  2022-01-06 .. 2022-01-10     3d  HighVol_Bull
+  2022-01-24 .. 2022-02-23    22d  HighVol_Bull
+  2022-03-23 .. 2022-03-25     3d  HighVol_Bull
+  2022-04-08 .. 2022-04-18     5d  LowVol_Bull
+  2022-06-22 .. 2022-07-28    27d  LowVol_Bear
+  2022-10-12 .. 2022-10-21     8d  HighVol_Bull
+  2022-11-07 .. 2022-12-23    34d  LowVol_Bull
+  2023-04-19 .. 2023-07-06    55d  LowVol_Bull
+  2023-07-10 .. 2023-07-12     3d  LowVol_Bull
+  2023-08-07 .. 2023-08-11     5d  HighVol_Bull
+  2023-08-24 .. 2023-09-18    18d  LowVol_Bull
+  2023-09-28 .. 2023-10-19    15d  HighVol_Bull
+  2023-10-23 .. 2023-11-22    21d  HighVol_Bull
+  2023-12-20 .. 2024-01-01     8d  HighVol_Bull
+  2024-01-03 .. 2024-01-12     8d  HighVol_Bull
+  2024-01-17 .. 2024-02-20    23d  HighVol_Bull
+  2024-04-08 .. 2024-04-10     3d  LowVol_Bull
+  2024-04-15 .. 2024-05-08    16d  LowVol_Bull
+  2024-06-03 .. 2024-07-02    21d  HighVol_Bull
+  2024-07-09 .. 2024-08-01    17d  LowVol_Bull
+  2024-09-06 .. 2024-09-27    16d  LowVol_Bull
+  2024-11-27 .. 2024-12-12    12d  HighVol_Bull
+  2024-12-17 .. 2024-12-19     3d  HighVol_Bull
+  2025-04-15 .. 2025-04-17     3d  HighVol_Bear
+  2025-05-29 .. 2025-06-06     7d  HighVol_Bull
+  2025-06-12 .. 2025-07-14    23d  LowVol_Bull
+  2025-08-26 .. 2025-08-29     3d  LowVol_Bull
+  2025-09-02 .. 2025-10-15    31d  LowVol_Bull
+  2025-10-30 .. 2025-11-04     4d  LowVol_Bull
+  2025-11-07 .. 2025-11-11     3d  LowVol_Bull
+  2025-11-13 .. 2025-11-25     9d  LowVol_Bull
+  2025-12-30 .. 2026-01-01     3d  LowVol_Bull
+  2026-01-27 .. 2026-01-30     4d  HighVol_Bull
+  2026-02-03 .. 2026-02-26    18d  HighVol_Bull
+  2026-03-23 .. 2026-04-30    25d  HighVol_Bear
+  2026-05-26 .. 2026-07-17    37d  LowVol_Bear
+
+SANITY  COVID 2020-02-15..2020-05-31 (67d): high_vol 73% (need >=50%), bear 76% (need >=30%)
+SANITY  bull 2023-05-01..2024-09-30 (350d): stable_bull 100% (need >=30%), stable_bear 0% (need <=5%)
+
+VOL-AXIS SENSITIVITY (days/episodes of high_vol)
+lookback     z |     high_vol
+      15   0.4 |      504/34 
+      15   0.5 |      476/36 
+      15   0.6 |      444/32 
+      20   0.4 |      527/28 
+      20   0.5 |      499/33 
+      20   0.6 |      473/29 
+      30   0.4 |      547/29 
+      30   0.5 |      508/23 
+      30   0.6 |      490/22 
+
+DIRECTION-AXIS SENSITIVITY (days/episodes of stable_bull | stable_bear)
+ ma_win  slope |      st_bull      st_bear
+    150     10 |     1082/19       297/6  
+    150     20 |     1067/17       286/7  
+    150     40 |     1039/16       262/6  
+    200     10 |     1063/15       206/5  
+    200     20 |     1059/15       192/4  
+    200     40 |     1009/12       170/3  
+    250     10 |     1136/12       142/5  
+    250     20 |     1129/11       120/3  
+    250     40 |     1121/12       114/3  
+
+NOTE lagged view (shift +1 day) is the executable one; Step 2 of the spec decides GO/NO-GO on it. Episodes, not days, are the sample unit.
+SANITY PASS
