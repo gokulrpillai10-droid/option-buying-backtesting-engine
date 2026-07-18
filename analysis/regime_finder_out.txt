@@ -77,15 +77,15 @@ lookback     z |     high_vol
 
 DIRECTION-AXIS SENSITIVITY (days/episodes of stable_bull | stable_bear)
  ma_win  slope |      st_bull      st_bear
-    150     10 |     1082/19       297/6  
-    150     20 |     1067/17       286/7  
-    150     40 |     1039/16       262/6  
+    150     10 |     1082/19       290/5  
+    150     20 |     1067/17       269/6  
+    150     40 |     1039/16       234/4  
     200     10 |     1063/15       206/5  
     200     20 |     1059/15       192/4  
     200     40 |     1009/12       170/3  
     250     10 |     1136/12       142/5  
     250     20 |     1129/11       120/3  
-    250     40 |     1121/12       114/3  
+    250     40 |     1121/12       110/2  
 
 NOTE lagged view (shift +1 day) is the executable one; Step 2 of the spec decides GO/NO-GO on it. Episodes, not days, are the sample unit.
 SANITY PASS

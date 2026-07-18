@@ -1,17 +1,20 @@
 """NIFTY regime finder — Step 1 of the regime project.
 
-Ports the rule-based labeler from the external Regime_based_project notebook
-(cell 19) with two fixes the review found there:
-  1. warm-up is an EXPLICIT truncation (the notebook's dropna() was a no-op
-     after .astype(int), leaving ~110 mislabeled early rows), and
-  2. zero rolling-std yields "no signal" instead of inf z-scores.
+Labels each day on two independent axes, each defined by what it does well
+(all trailing — no look-ahead):
 
-Label pipeline (per day, all trailing — no look-ahead):
+    DIRECTION (bull/bear) = ABSOLUTE, price vs its 200d MA + MA slope
+      bull  = close > MA200 AND MA200 rising
+      bear  = close < MA200 AND MA200 falling      (flat MA -> neither = neutral)
+    VOLATILITY (high/low) = RELATIVE, 20d vol z-scored vs a 90d baseline, |z|>0.5
+    then 4-of-5-day persistence -> stable_bull / stable_bear / stable_low_vol
 
-    closes ->  20d returns-vol ----\
-           ->  20d trend (pct_chg) --> z-score vs rolling 90d baseline
-                                        |z| > 0.5 -> bull/bear, high/low vol
-                                        -> 4-of-5-day persistence -> stable_*
+The volatility axis and the two data-hygiene fixes are ported from the external
+Regime_based_project notebook (cell 19): (1) warm-up is an EXPLICIT truncation
+(the notebook's dropna() was a no-op after .astype(int)); (2) zero rolling-std
+yields "no signal" instead of inf z-scores. The direction axis REPLACES the
+notebook's relative trend z-score, which was mean-reverting and labeled ~25% of
+the 2023-24 rally as bear — see the design doc's "Directional redesign" note.
 
 Spec: docs/superpowers/specs/2026-07-18-regime-finder-design.md
 Input: analysis/nifty_daily.csv (^NSEI spot; NOT daily_underlying.csv — see spec).
@@ -55,12 +58,16 @@ def label_regimes(closes, lookback=20, z_win=90, z_thresh=0.5,
     vol_z = (rolling_vol - rolling_vol.rolling(z_win).mean()) / vol_sd.replace(0.0, np.nan)
 
     # --- direction axis (absolute: price vs long MA + MA slope) ---
+    # rising/falling are STRICT: a flat MA is neither, so a flat-MA band stays
+    # neutral (neither bull nor bear) symmetrically. Using ~rising for bear
+    # would fold the flat band into bear -- "not rising" != "falling".
     ma = closes.rolling(ma_win).mean()
     rising = ma > ma.shift(slope_win)
+    falling = ma < ma.shift(slope_win)
 
     # warm-up = first row where BOTH the vol baseline and the MA are valid.
-    # bear uses ~rising (False where ma is NaN), so pre-warmup rows can't be
-    # spuriously bear even before truncation.
+    # (rising/falling are False where ma is NaN, so pre-warmup rows can't be
+    # spuriously labeled even before truncation.)
     warm_ok = vol_sd.notna() & ma.notna()
     if not warm_ok.any():
         raise ValueError(f"series too short: {len(closes)} rows, "
@@ -68,7 +75,7 @@ def label_regimes(closes, lookback=20, z_win=90, z_thresh=0.5,
 
     r = pd.DataFrame(index=closes.index)
     r["bull"] = (closes > ma) & rising
-    r["bear"] = (closes < ma) & ~rising
+    r["bear"] = (closes < ma) & falling
     r["high_vol"] = vol_z > z_thresh
     r["low_vol"] = vol_z < -z_thresh
     for name, col in [("stable_bull", "bull"), ("stable_bear", "bear"),

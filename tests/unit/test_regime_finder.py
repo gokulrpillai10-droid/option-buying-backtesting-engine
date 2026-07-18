@@ -49,8 +49,9 @@ def test_persistence_requires_today_true():
 def test_warmup_truncated():
     closes = make_closes()
     labels = label_regimes(closes)
-    # first valid row now needs ma_win (200) observations (dominates lookback+z_win)
-    assert labels.index[0] >= closes.index[198]
+    # first valid row now needs ma_win (200) observations (dominates lookback+z_win);
+    # rolling(200) is first valid at index 199
+    assert labels.index[0] >= closes.index[199]
     assert labels.index[0] <= closes.index[215]  # not over-truncated
     assert labels.notna().all().all()
 
@@ -90,6 +91,21 @@ def test_sustained_decline_labels_bear():
     assert move["bear"].sum() > 0
     assert move["stable_bear"].sum() > 0
     assert move["stable_bull"].sum() == 0
+
+
+def test_flat_ma_below_price_is_neutral_not_bear():
+    # An exactly-flat MA is neither rising nor falling -> price below it must be
+    # NEUTRAL, not bear. Guards against bear = close<ma & ~rising (which would
+    # fold the flat band into bear; "not rising" != "falling").
+    # A perfectly alternating 12/8 series has a 2-day MA that is exactly 10 on
+    # every step, so the MA never rises or falls; the "8" rows sit below it.
+    closes = _series([12.0 if i % 2 == 0 else 8.0 for i in range(140)])
+    labels = label_regimes(closes, ma_win=2, slope_win=1)
+    ma = closes.rolling(2).mean()
+    below = (closes < ma).loc[labels.index]
+    assert below.any()               # the "8" rows really are below the flat MA
+    assert labels["bear"].sum() == 0  # yet nothing is bear (MA never falls)
+    assert labels["bull"].sum() == 0  # symmetric: nothing bull either (never rises)
 
 
 def test_crash_labels_high_vol():
