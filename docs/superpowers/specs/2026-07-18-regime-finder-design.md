@@ -50,8 +50,10 @@ Strategy P&L attribution + verdict, per the eng-review + outside-voice decisions
 - **GO metric = counterfactual equity replay** (CPR curve with exposure throttled on
   lagged bear/high-vol days) vs. always-on: return, max DD, Sharpe — NOT loss-share
   buckets (tautology risk for vol-linked options strategies).
-- Null benchmarks: block-shuffled regime calendar (matched episode structure) and
-  dumb baseline "throttle when trailing 20-day own-equity is down". Labeler must beat both.
+- Null benchmarks: block-shuffled regime calendar (matched episode structure), dumb
+  baseline "throttle when trailing 20-day own-equity is down", and India VIX quantile
+  throttle (`analysis/india_vix.csv`, 2019-06→2026-07, fetched 2026-07-18, cross-checked
+  vs tradealgo copy). Labeler must beat all three.
 - Split-half agreement (2023–24 vs 2025–26) as a hard GO condition.
 - Sample guards: ≥30 P&L days AND ≥3 distinct episodes per bucket, else
   "insufficient sample" and ineligible to drive the verdict (4A + episodes).
