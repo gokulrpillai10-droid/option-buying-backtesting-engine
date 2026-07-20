@@ -15,7 +15,6 @@ from __future__ import annotations
 from datetime import date, time
 
 import numpy as np
-import pandas as pd
 
 from analysis.gap_fill_excursion import atm_strike, excursion_with_stop
 from engine.data.catalog import Catalog
@@ -29,6 +28,12 @@ SPREAD_ASSUMED = 3.0                    # assumed round-trip option spread, prem
 BUCKETS = [0.0005, 0.0015, 0.003, 0.005]
 BLAB = ["0.05-0.15", "0.15-0.30", "0.30-0.50"]
 T0915, T0920, T1515 = time(9, 15), time(9, 20), time(15, 15)
+
+
+def _bucket(absgap):
+    """Gap sub-bucket label for ``absgap`` (clamped so |gap|==CAP lands in the top bucket)."""
+    i = min(np.searchsorted(BUCKETS, absgap, side="right") - 1, len(BLAB) - 1)
+    return BLAB[i]
 
 
 def day_rows(spot, chain, day):
@@ -76,7 +81,7 @@ def day_rows(spot, chain, day):
         return None
     entry = path[0]
     absgap = abs(gap)
-    bucket = BLAB[np.searchsorted(BUCKETS, absgap, side="right") - 1]
+    bucket = _bucket(absgap)
     return bucket, entry, path
 
 
