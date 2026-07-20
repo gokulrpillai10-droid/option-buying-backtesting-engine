@@ -2,11 +2,12 @@
 
 Both buy an ATM weekly option and share the frozen premium exit
 (strategies/gap_fill_params). Selection is measured off the SETTLED open (close
-of the 09:15 bar ~= 09:20 price), not the raw auction open. Exit numbers are
-frozen from 2020-2024 and never swept.
+of the 09:15 bar ~= 09:20 price), stashed at 09:15 and used by the single
+authoritative selector `_select` for both arms. Exit numbers are frozen from
+2020-2024 and never swept.
 
 Arm F: gap-up -> PUT, gap-down -> CALL (fade back toward prior close).
-Arm R: gap-down that has reclaimed its open by 09:30 -> CALL (failed gap flips).
+Arm R: gap-down that has reclaimed its 09:15 open by 09:30 -> CALL.
 """
 from datetime import time
 
@@ -16,8 +17,9 @@ from engine.strategy.exit import Exit, TwoStage
 from strategies import gap_fill_params as P
 
 LOTS = 6
-DECIDE_F = time(9, 15)      # 09:15 bar close = settled open; fills next bar ~09:20
-DECIDE_R = time(9, 30)      # reclaim checkpoint
+RECORD = time(9, 15)        # stash settled open / day open (both arms)
+DECIDE_F = time(9, 15)      # fade decides at 09:15 (fills next bar ~09:20)
+DECIDE_R = time(9, 30)      # reversal decides at 09:30
 SQUARE = time(15, 15)
 
 
@@ -34,33 +36,40 @@ class GapFillFade(Strategy):
         assert arm in ("fade", "reversal")
         self.arm = arm
         self.lots = lots
-        # book 4/6 at +BOOK, trail the 2/6 by TRAIL, full premium stop at -STOP
+        # book 4/6 at +BOOK, trail 2/6 by TRAIL, full premium stop at -STOP
         self._two = TwoStage(P.BOOK, P.TRAIL, 4 / 6, stop_pts=P.STOP)
 
     def on_day_start(self, ctx):
         self.entered = False
         self.settled = None
         self.day_open = None
+        self.pc = None
         self._two.reset()
 
-    def _select(self, ctx):
-        pc = ctx.prev_close()
-        if pc is None:
-            return None
+    def _record_open(self, ctx):
+        """Stash the 09:15 settled open (bar close), raw day open, prev close."""
+        self.pc = ctx.prev_close()
         bar = ctx.spot_bar
-        settled = bar.close                       # 09:15 bar close ~= 09:20
-        self.settled = settled
+        self.settled = bar.close
         self.day_open = bar.open
-        gap = settled / pc - 1.0
+
+    def _select(self, ctx):
+        """Single authoritative selector for BOTH arms, using the stashed 09:15
+        settled open. Returns (side, strike) or None (stand aside)."""
+        if self.pc is None or self.settled is None:
+            return None
+        gap = self.settled / self.pc - 1.0
         if not (P.FLOOR <= abs(gap) <= P.CAP):
             return None
         if self.arm == "fade":
             side = "PUT" if gap > 0 else "CALL"
-        else:                                     # reversal: gap-down only
-            if gap >= 0:
+            ref = self.settled
+        else:                                  # reversal: gap-down that reclaimed the open
+            if gap >= 0 or ctx.spot_bar.close <= self.day_open:
                 return None
             side = "CALL"
-        strike = _atm(ctx.snapshot(), settled, side)
+            ref = ctx.spot_bar.close
+        strike = _atm(ctx.snapshot(), ref, side)
         if strike is None:
             return None
         return side, strike
@@ -69,31 +78,14 @@ class GapFillFade(Strategy):
         if self.entered:
             return []
         t = ctx.now.time()
-        if self.arm == "fade":
-            if t != DECIDE_F:
-                return []
-            sel = self._select(ctx)
-            if sel is None:
-                return []
-        else:
-            if t < DECIDE_F:
-                return []
-            if t == DECIDE_F:                     # record settled/open, wait for 09:30
-                self._select(ctx)                 # sets self.settled/day_open only
-                return []
-            if t != DECIDE_R:
-                return []
-            # reclaim: gap-down (settled<pc) AND price back above the day open
-            pc = ctx.prev_close()
-            if pc is None or self.settled is None or self.settled >= pc:
-                return []
-            if ctx.spot_bar.close <= self.day_open:
-                return []
-            side = "CALL"
-            strike = _atm(ctx.snapshot(), ctx.spot_bar.close, side)
-            if strike is None:
-                return []
-            sel = (side, strike)
+        if t == RECORD:
+            self._record_open(ctx)
+        decide = DECIDE_F if self.arm == "fade" else DECIDE_R
+        if t != decide:
+            return []
+        sel = self._select(ctx)
+        if sel is None:
+            return []
         side, strike = sel
         self.entered = True
         return [Order(side=side, strike=strike, lots=self.lots)]

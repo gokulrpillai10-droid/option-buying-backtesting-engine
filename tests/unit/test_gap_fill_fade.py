@@ -1,4 +1,4 @@
-from datetime import datetime, time
+from datetime import datetime
 
 from strategies.gap_fill_fade import GapFillFade
 from strategies import gap_fill_params as p
@@ -20,64 +20,92 @@ class FakeChain:
     def snapshot_at(self, dt): return FakeSnap(self._s)
 
 
+class _Bar:
+    def __init__(self, open_, close): self.open = open_; self.close = close
+
+
 class FakeCtx:
-    """Minimal BarContext stand-in for selection tests."""
-    def __init__(self, now, settled, pc, strikes=(23900, 23950, 24000, 24050, 24100)):
-        self._now = now; self._settled = settled; self._pc = pc
+    def __init__(self, now, open_, close, pc,
+                 strikes=(23900, 23950, 24000, 24050, 24100)):
+        self._now = now; self._open = open_; self._close = close; self._pc = pc
         self._chain = FakeChain(list(strikes))
     @property
     def now(self): return self._now
     @property
-    def spot_bar(self):
-        class B: pass
-        b = B(); b.open = self._settled; b.high = self._settled
-        b.low = self._settled; b.close = self._settled; return b
+    def spot_bar(self): return _Bar(self._open, self._close)
     def prev_close(self): return self._pc
     def snapshot(self): return self._chain.snapshot_at(self._now)
 
 
-def _ctx(settled, pc):
-    return FakeCtx(datetime(2024, 6, 3, 9, 15), settled, pc)
+def _fade_select(settled, pc):
+    s = GapFillFade(arm="fade")
+    s.on_day_start(None)
+    ctx = FakeCtx(datetime(2024, 6, 3, 9, 15), settled, settled, pc)
+    s._record_open(ctx)
+    return s._select(ctx)
 
 
 def test_fade_skips_below_floor():
-    # gap = FLOOR/2 -> below floor -> no trade
-    s = GapFillFade(arm="fade")
-    settled = 24000 * (1 + p.FLOOR / 2)
-    assert s._select(_ctx(settled, 24000)) is None
+    assert _fade_select(24000 * (1 + p.FLOOR / 2), 24000) is None
 
 
 def test_fade_skips_above_cap():
-    s = GapFillFade(arm="fade")
-    settled = 24000 * (1 + p.CAP + 0.001)
-    assert s._select(_ctx(settled, 24000)) is None
+    assert _fade_select(24000 * (1 + p.CAP + 0.001), 24000) is None
 
 
 def test_fade_gap_up_selects_put():
-    s = GapFillFade(arm="fade")
-    settled = 24000 * (1 + (p.FLOOR + p.CAP) / 2)     # in band, gap up
-    side, strike = s._select(_ctx(settled, 24000))
+    side, _ = _fade_select(24000 * (1 + (p.FLOOR + p.CAP) / 2), 24000)
     assert side == "PUT"
 
 
 def test_fade_gap_down_selects_call():
-    s = GapFillFade(arm="fade")
-    settled = 24000 * (1 - (p.FLOOR + p.CAP) / 2)     # in band, gap down
-    side, strike = s._select(_ctx(settled, 24000))
+    side, _ = _fade_select(24000 * (1 - (p.FLOOR + p.CAP) / 2), 24000)
     assert side == "CALL"
 
 
 def test_no_prev_close_stands_aside():
-    s = GapFillFade(arm="fade")
-    assert s._select(_ctx(24100, None)) is None
+    assert _fade_select(24100, None) is None
+
+
+def test_reversal_enters_call_on_reclaim():
+    s = GapFillFade(arm="reversal")
+    s.on_day_start(None)
+    # 09:15: gap-down, day_open 23900, settled(close) 23910, pc 24000
+    assert s.on_bar(FakeCtx(datetime(2024, 6, 3, 9, 15), 23900, 23910, 24000)) == []
+    # 09:30: close 23950 reclaims the 23900 open -> CALL
+    orders = s.on_bar(FakeCtx(datetime(2024, 6, 3, 9, 30), 23950, 23950, 24000))
+    assert len(orders) == 1 and orders[0].side == "CALL"
+
+
+def test_reversal_no_entry_if_not_reclaimed():
+    s = GapFillFade(arm="reversal")
+    s.on_day_start(None)
+    s.on_bar(FakeCtx(datetime(2024, 6, 3, 9, 15), 23900, 23910, 24000))
+    # 09:30 close 23880 still below the 23900 open -> no reclaim
+    assert s.on_bar(FakeCtx(datetime(2024, 6, 3, 9, 30), 23880, 23880, 24000)) == []
+
+
+def test_reversal_skips_gap_up():
+    s = GapFillFade(arm="reversal")
+    s.on_day_start(None)
+    s.on_bar(FakeCtx(datetime(2024, 6, 3, 9, 15), 24100, 24100, 24000))
+    assert s.on_bar(FakeCtx(datetime(2024, 6, 3, 9, 30), 24200, 24200, 24000)) == []
+
+
+def test_reversal_skips_below_floor_even_if_reclaimed():
+    s = GapFillFade(arm="reversal")
+    s.on_day_start(None)
+    settled = 24000 * (1 - p.FLOOR / 2)          # gap-down but below band
+    s.on_bar(FakeCtx(datetime(2024, 6, 3, 9, 15), 23990, settled, 24000))
+    # 09:30 reclaims (24010 > 23990 open) but gap below FLOOR -> no trade
+    assert s.on_bar(FakeCtx(datetime(2024, 6, 3, 9, 30), 24010, 24010, 24000)) == []
 
 
 def test_manage_returns_eod_after_square():
     s = GapFillFade(arm="fade")
     class Ctx:
         now = datetime(2024, 6, 3, 15, 20)
-    ex = s.manage(Ctx(), pos=None)
-    assert ex.reason == "eod"
+    assert s.manage(Ctx(), pos=None).reason == "eod"
 
 
 def test_two_stage_wired_from_frozen_params():
