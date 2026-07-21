@@ -1,0 +1,64 @@
+Loading spot + catalog ...
+
+PE RECLAIM RE-ENTRY -- PUT on close-confirmed break-below after a green up-break
+A/B: ATM strike vs deep-ITM (150pt), each +/- the day-open IV filter
+
+################  ATM STRIKE  ################
+
+=== ATM  + IV filter <= 0.12 ===
+  entry days (PE reclaim re-entries): 109   legs: 125
+  NET  Rs-26,887    PF 0.95    win 42%    t 2.07
+  day-level: positive 36 / negative 73    Sharpe -0.33    expectancy Rs-247/day
+  by year:
+     2020:   4 days   net Rs     -5,162   pos  1/4 
+     2021:   9 days   net Rs      7,192   pos  3/9 
+     2022:   1 days   net Rs     23,928   pos  1/1 
+     2023:  43 days   net Rs    -87,333   pos 11/43
+     2024:  16 days   net Rs    -21,393   pos  5/16
+     2025:  27 days   net Rs    101,864   pos 14/27
+     2026:   9 days   net Rs    -45,983   pos  1/9 
+  exit reasons: {'cpr_stop': 62, 'eod': 33, 'book': 16, 'ptrail': 14}
+
+=== ATM  + no IV filter ===
+  entry days (PE reclaim re-entries): 390   legs: 480
+  NET  Rs-50,439    PF 0.98    win 48%    t 5.37
+  day-level: positive 141 / negative 249    Sharpe -0.14    expectancy Rs-129/day
+  by year:
+     2020:  65 days   net Rs     27,975   pos 23/65
+     2021:  63 days   net Rs   -142,563   pos 18/63
+     2022:  54 days   net Rs     43,319   pos 22/54
+     2023:  63 days   net Rs     69,018   pos 22/63
+     2024:  72 days   net Rs    -29,693   pos 29/72
+     2025:  64 days   net Rs     27,487   pos 26/64
+     2026:   9 days   net Rs    -45,983   pos  1/9 
+  exit reasons: {'cpr_stop': 202, 'eod': 101, 'book': 90, 'ptrail': 87}
+
+################  DEEP-ITM (150pt) -- baseline  ################
+
+=== ITM  + IV filter <= 0.12 ===
+  entry days (PE reclaim re-entries): 109   legs: 136
+  NET  Rs41,194    PF 1.06    win 49%    t 3.48
+  day-level: positive 39 / negative 70    Sharpe 0.41    expectancy Rs378/day
+  by year:
+     2020:   4 days   net Rs    -10,703   pos  1/4 
+     2021:   9 days   net Rs     -6,427   pos  3/9 
+     2022:   1 days   net Rs     24,406   pos  1/1 
+     2023:  43 days   net Rs    -46,839   pos 13/43
+     2024:  16 days   net Rs     -5,439   pos  6/16
+     2025:  27 days   net Rs    150,634   pos 14/27
+     2026:   9 days   net Rs    -64,439   pos  1/9 
+  exit reasons: {'cpr_stop': 59, 'book': 27, 'ptrail': 26, 'eod': 24}
+
+=== ITM  + no IV filter ===
+  entry days (PE reclaim re-entries): 390   legs: 514
+  NET  Rs90,331    PF 1.03    win 55%    t 6.97
+  day-level: positive 157 / negative 233    Sharpe 0.22    expectancy Rs232/day
+  by year:
+     2020:  65 days   net Rs     -3,432   pos 26/65
+     2021:  63 days   net Rs   -120,820   pos 21/63
+     2022:  54 days   net Rs     92,196   pos 25/54
+     2023:  63 days   net Rs    106,937   pos 25/63
+     2024:  72 days   net Rs      9,568   pos 32/72
+     2025:  64 days   net Rs     70,321   pos 27/64
+     2026:   9 days   net Rs    -64,439   pos  1/9 
+  exit reasons: {'cpr_stop': 194, 'book': 124, 'ptrail': 121, 'eod': 75}
