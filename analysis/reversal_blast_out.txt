@@ -1,0 +1,48 @@
+ADANIENT bars=605,448  2020-01-01 -> 2026-07-14   qty=500  slip=0.05%  target=+/-1.25%
+
+== HEADLINE (full period) ==
+  A full       trades= 607  net=   -854,371  PF= 0.42  win=22.4%  tail-3=   -909,410  t=-8.03  [L 258 / S 349]
+  A2 no-recross trades= 607  net=   -625,843  PF= 0.65  win=35.3%  tail-3=   -689,110  t=-4.59  [L 258 / S 349]
+  B no-EMA     trades= 685  net=   -943,172  PF= 0.14  win=15.0%  tail-3=   -971,973  t=-16.64  [L 300 / S 385]
+  D full+hard50 trades=  68  net=    -78,578  PF= 0.51  win=20.6%  tail-3=   -124,077  t=-2.31  [L 30 / S 38]
+  C dir-null   trades= 648  net=   -886,907  PF= 0.39  win=16.7%  tail-3=   -944,189  t=-9.47  [L 340 / S 308]
+
+== FIXED-POINT SCALP TARGET (full entry: osc+candle+EMA, stop, no recross) ==
+  10pt         trades= 607  net=   -688,453  PF= 0.53  win=44.3%  tail-3=   -701,614  t=-5.39  [L 258 / S 349]
+  15pt         trades= 607  net=   -634,249  PF= 0.62  win=39.7%  tail-3=   -654,489  t=-4.73  [L 258 / S 349]
+  20pt         trades= 607  net=   -639,331  PF= 0.64  win=36.9%  tail-3=   -666,906  t=-4.49  [L 258 / S 349]
+  25pt         trades= 607  net=   -639,339  PF= 0.65  win=35.4%  tail-3=   -674,415  t=-4.15  [L 258 / S 349]
+  30pt         trades= 607  net=   -645,656  PF= 0.64  win=34.9%  tail-3=   -688,329  t=-4.10  [L 258 / S 349]
+  -- 15pt: direction & no-EMA controls --
+  15pt full    trades= 607  net=   -634,249  PF= 0.62  win=39.7%  tail-3=   -654,489  t=-4.73  [L 258 / S 349]
+  15pt no-EMA  trades= 685  net=   -772,299  PF= 0.55  win=29.1%  tail-3=   -792,603  t=-6.38  [L 300 / S 385]
+  15pt dir-null trades= 648  net=   -635,699  PF= 0.57  win=27.3%  tail-3=   -656,373  t=-5.78  [L 340 / S 308]
+    2020: net=    -12,612  trades= 87  win=34.5%
+    2021: net=    -71,566  trades= 85  win=36.5%
+    2022: net=    -65,433  trades= 87  win=48.3%
+    2023: net=   -125,099  trades= 82  win=39.0%
+    2024: net=    -93,804  trades= 88  win=47.7%
+    2025: net=   -188,501  trades=114  win=33.3%
+    2026: net=    -77,233  trades= 64  win=40.6%
+  15pt exits: {'stop': 291, 'target': 157, 'time': 132, 'eod': 27}
+
+== FULL (A): per-year ==
+    2020: net=    -16,320  trades= 87  win=24.1%
+    2021: net=    -75,038  trades= 85  win=27.1%
+    2022: net=   -129,212  trades= 87  win=23.0%
+    2023: net=   -104,018  trades= 82  win=28.0%
+    2024: net=   -165,440  trades= 88  win=21.6%
+    2025: net=   -214,592  trades=114  win=16.7%
+    2026: net=   -149,753  trades= 64  win=17.2%
+  exits: {'emax': 492, 'stop': 56, 'target': 44, 'eod': 13, 'time': 2}
+
+== read ==
+  A vs C: if A's edge is real it must clear the dir-null (coin-flip direction).
+  A vs B: whether the 1-min EMA trigger earns its extra latency.
+  D vs A: whether the 15/50 alignment filter helps or just cuts trades.
+
+== VERDICT ==
+  Every variant loses every year. Fairest hold-to-target (A2) is still net -625,843, PF 0.65.
+  Dir-null (C, coin-flip direction) nets -886,907 vs A's -854,371 -- the reversal call carries ~no directional information (104% of A).
+  A fixed scalp target (10-30pt) lifts win-rate but still loses every year (15pt: -634k, PF 0.62) -- the signal-candle stop (30-50pt on a 5-min bar) dwarfs a 15pt target, so stops outnumber targets ~2:1.
+  NO-GO. Three-oscillator 'extreme' on a momentum name (ADANIENT) is a falling-knife: oversold keeps falling, overbought keeps running. The signal has no edge net of costs -- the dir-null coin-flip ties it under BOTH pct and 15pt targets -- so no exit tweak (recross, hold-to-target, or scalp) rescues it. The problem is the entry, not the exit.
