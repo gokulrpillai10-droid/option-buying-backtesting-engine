@@ -1,0 +1,37 @@
+ADANIENT bars=605,448  2020-01-01 -> 2026-07-14   qty=500  slip=0.05%  pivotK=3 arm=12 body>=0.6
+
+== EXIT=R2 ==
+  full             trades= 901  net= -1,254,119  PF= 0.55  win=32.5%  tail-3= -1,352,274  t=-7.68  [L 521 / S 380]
+  dir-null         trades= 874  net= -1,174,179  PF= 0.42  win=22.7%  tail-3= -1,252,259  t=-10.03  [L 431 / S 443]
+  no-200filter     trades=1180  net= -1,990,416  PF= 0.48  win=30.8%  tail-3= -2,101,436  t=-9.60  [L 634 / S 546]
+    2020: net=    -35,360  trades=144  win=32.6%
+    2021: net=   -184,988  trades=130  win=29.2%
+    2022: net=   -242,207  trades=133  win=30.8%
+    2023: net=   -278,030  trades=141  win=29.1%
+    2024: net=   -214,937  trades=145  win=36.6%
+    2025: net=   -159,439  trades=136  win=37.5%
+    2026: net=   -139,159  trades= 72  win=30.6%
+  exits: {'stop': 537, 'target': 266, 'eod': 98}
+
+== EXIT=TRAIL ==
+  full             trades= 901  net=   -872,480  PF= 0.71  win=23.2%  tail-3= -1,081,479  t=-4.30  [L 521 / S 380]
+  dir-null         trades= 874  net=   -832,177  PF= 0.62  win=16.8%  tail-3= -1,020,099  t=-4.68  [L 431 / S 443]
+  no-200filter     trades=1180  net= -1,411,388  PF= 0.66  win=20.3%  tail-3= -1,645,238  t=-5.71  [L 634 / S 546]
+    2020: net=    -35,459  trades=144  win=19.4%
+    2021: net=    -98,431  trades=130  win=22.3%
+    2022: net=    -33,215  trades=133  win=25.6%
+    2023: net=   -326,139  trades=141  win=17.7%
+    2024: net=   -146,409  trades=145  win=27.6%
+    2025: net=   -134,337  trades=136  win=27.2%
+    2026: net=    -98,490  trades= 72  win=22.2%
+  exits: {'stop': 567, 'eod': 230, 'trail': 104}
+
+== read ==
+  full vs dir-null: does the WITH-trend break beat a coin-flip of direction?
+  full vs no-200:   does the 200-EMA trend filter actually help?
+  R2 vs TRAIL:      does riding the 9/21 cross capture the promised runners?
+
+== VERDICT ==
+  200-EMA filter WORKS: dropping it worsens net -1,254,119 -> -1,990,416 (R2). With-trend beats counter-trend; the trend call also beats the coin-flip on PF/win. So the SIGNAL has merit.
+  BUT intraday-cage kills the payoff: 230 of 901 TRAIL trades exit on the 15:15 square-off, only 104 on the actual 9/21 trail. The 1:5 runner needs MULTI-DAY holding; MIS flattens it every session.
+  NO-GO as an intraday strategy (loses every year, both exits). It is MIS-CAGED, not edgeless: the right test is a SWING/POSITIONAL engine (overnight carry, 9/21 trail on daily/15-min, split-adjusted data) -- a different engine than this repo has today.
