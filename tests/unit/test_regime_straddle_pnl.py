@@ -8,7 +8,27 @@ the honest cost/slippage treatment, reusing the engine's SpreadPosition math.
 """
 from engine.execution.costs import CostModel
 from engine.position.manager import Trade
-from analysis.regime_straddle_pnl import straddle_trade, direction_for, summarize
+from analysis.regime_straddle_pnl import (
+    straddle_trade, direction_for, summarize, atm_strike, straddle_from_snapshots,
+)
+
+
+class _Q:
+    def __init__(self, traded, close=0.0):
+        self.is_traded, self.close = traded, close
+
+
+class _Snap:
+    """Duck-typed OptionChainSnapshot. ``calls``/``puts`` map strike->close for
+    traded strikes; a strike absent from the map is treated as not-traded."""
+    def __init__(self, calls, puts):
+        self._c, self._p = dict(calls), dict(puts)
+    def strikes(self):
+        return sorted(set(self._c) | set(self._p))
+    def call(self, k):
+        return _Q(k in self._c, self._c.get(k, 0.0))
+    def put(self, k):
+        return _Q(k in self._p, self._p.get(k, 0.0))
 
 
 def _t(net):
@@ -76,3 +96,42 @@ def test_summarize_empty_is_zeroed_not_a_crash():
     assert s["n"] == 0 and s["net"] == 0.0
     assert s["win_rate"] == 0.0
     assert s["profit_factor"] == 0.0              # no losses AND no wins -> defined 0, not inf/NaN
+
+
+def test_atm_strike_picks_nearest_with_both_legs_traded():
+    snap = _Snap(calls={19900: 5, 20000: 5, 20100: 5},
+                 puts={19900: 5, 20000: 5, 20100: 5})
+    assert atm_strike(snap, ref_price=20010) == 20000     # nearest to spot
+
+
+def test_atm_strike_skips_strike_missing_a_leg():
+    # 20000 is nearest but its PUT is not traded -> must fall to a fully-traded strike
+    snap = _Snap(calls={19900: 5, 20000: 5, 20100: 5}, puts={19900: 5, 20100: 5})
+    assert atm_strike(snap, ref_price=20010) == 20100     # nearest where BOTH trade
+
+
+def test_atm_strike_none_when_no_strike_has_both_legs():
+    snap = _Snap(calls={20000: 5}, puts={})
+    assert atm_strike(snap, ref_price=20000) is None
+
+
+def test_straddle_from_snapshots_assembles_a_trade():
+    # calm/short: enter ATM 20000 straddle at 120+110=230, decay to 40+30=70
+    entry = _Snap(calls={20000: 120.0}, puts={20000: 110.0})
+    exit_ = _Snap(calls={20000: 40.0}, puts={20000: 30.0})
+    t = straddle_from_snapshots(entry, exit_, ref_price=20005, qty=75,
+                                direction="short", cost_model=CostModel(), slip=0.0)
+    # short gross = ((120-40) + (110-30)) * 75 = 160 * 75 = 12000
+    assert t.strike == 20000
+    assert t.gross == 12000.0
+    assert 0 < t.net < t.gross
+
+
+def test_straddle_from_snapshots_none_when_no_atm_or_exit_leg():
+    entry = _Snap(calls={20000: 100.0}, puts={})          # no ATM (put missing)
+    exit_ = _Snap(calls={20000: 40.0}, puts={20000: 30.0})
+    assert straddle_from_snapshots(entry, exit_, 20000, 75, "short", CostModel()) is None
+    # ATM ok at entry, but the strike vanished from the exit chain -> None, not a crash
+    entry2 = _Snap(calls={20000: 100.0}, puts={20000: 90.0})
+    exit2 = _Snap(calls={}, puts={})
+    assert straddle_from_snapshots(entry2, exit2, 20000, 75, "short", CostModel()) is None

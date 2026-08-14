@@ -16,6 +16,40 @@ from engine.execution.costs import CostModel
 from engine.position.manager import SpreadLeg, SpreadPosition, Trade
 
 
+def atm_strike(snapshot, ref_price: float):
+    """Nearest strike to ``ref_price`` where BOTH the call and put are traded,
+    or ``None`` if no strike has both legs. A straddle needs both legs fillable at
+    the same strike, so a strike missing one side is skipped (not silently used).
+    """
+    best, best_dist = None, None
+    for k in snapshot.strikes():
+        if not (snapshot.call(k).is_traded and snapshot.put(k).is_traded):
+            continue
+        dist = abs(k - ref_price)
+        if best_dist is None or dist < best_dist:
+            best, best_dist = k, dist
+    return best
+
+
+def straddle_from_snapshots(entry_snap, exit_snap, ref_price: float, qty: int,
+                            direction: str, cost_model: CostModel, slip: float = 0.0):
+    """Assemble one straddle ``Trade`` from an entry and an exit chain snapshot of
+    the SAME expiry. Returns ``None`` (skip, never crash) if there is no ATM strike
+    with both legs traded at entry, or that strike is not tradeable at exit.
+    """
+    strike = atm_strike(entry_snap, ref_price)
+    if strike is None:
+        return None
+    if strike not in exit_snap.strikes():
+        return None
+    xc, xp = exit_snap.call(strike), exit_snap.put(strike)
+    if not (xc.is_traded and xp.is_traded):
+        return None
+    ec, ep = entry_snap.call(strike), entry_snap.put(strike)
+    return straddle_trade(strike, ec.close, ep.close, xc.close, xp.close,
+                          qty, direction, cost_model, slip)
+
+
 def summarize(trades) -> dict:
     """Aggregate a set of straddle ``Trade``s into thermometer stats.
 
