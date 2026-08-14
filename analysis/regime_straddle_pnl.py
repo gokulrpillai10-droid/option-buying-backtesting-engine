@@ -12,6 +12,8 @@ Spec: docs/superpowers/specs/2026-08-13-regime-buysell-detector-design.md
 """
 from __future__ import annotations
 
+import sys
+
 from engine.execution.costs import CostModel
 from engine.position.manager import SpreadLeg, SpreadPosition, Trade
 
@@ -103,3 +105,140 @@ def straddle_trade(strike: int, entry_call: float, entry_put: float,
         exit_prices=(exit_call, exit_put), cost_model=cost_model, slip=slip,
         reason=f"straddle_{direction}",
     )
+
+
+# ------------------------------------------------------------------ #
+# Real-data driver (research entry point; pure helpers above are tested)
+# ------------------------------------------------------------------ #
+ROOT = "/Users/gokul/Desktop/tradealgo/data nifty "
+NIFTY_CSV = "analysis/nifty_daily.csv"
+DATA_END = "2026-02-25"          # option chain ends here
+HOLD_MIN_DTE = 21                # enter a contract with >=21 DTE, hold to its expiry
+SLIP = 0.0025
+
+
+def _episode_entries(labels):
+    """One entry per regime episode: (entry_date, direction). calm->short (theta),
+    stormy->long (gamma). Episodes are the independent statistical unit."""
+    from analysis.regime_finder import episodes
+    out = []
+    for s, _e, _d in episodes(labels["stable_low_vol"]):
+        out.append((s.date(), "short"))
+    for s, _e, _d in episodes(labels["high_vol"]):
+        out.append((s.date(), "long"))
+    return sorted(out)
+
+
+def _eod_snap(day_df):
+    """(snapshot, dt) at the session's last minute for a single-day chain frame."""
+    from engine.data.chain import Chain
+    if day_df.empty:
+        return None
+    eod = day_df["DateTime"].max()
+    return Chain(day_df).snapshot_at(eod)
+
+
+def _collect_episode_snapshots(entries, md, cat):
+    """For each episode, resolve its held contract and return
+    (entry_date, regime_dir, entry_snap, exit_snap, ref_spot, qty). Skips (logs)
+    episodes with no contract/day/data."""
+    import pandas as pd
+    from engine.instruments import lot_size_for
+
+    closes = pd.read_csv(NIFTY_CSV, parse_dates=["date"], index_col="date")["close"]
+    cache = {}
+    rows, skipped = [], 0
+    for entry_date, direction in entries:
+        E = md.expiry_for(entry_date)
+        if E is None:
+            skipped += 1; continue
+        e_iso = E.isoformat()
+        path = cat.path_for(e_iso)
+        if path is None:
+            skipped += 1; continue
+        if e_iso not in cache:
+            df = pd.read_parquet(path)
+            df["DateTime"] = pd.to_datetime(df["DateTime"])
+            df["_d"] = df["DateTime"].dt.date
+            cache[e_iso] = df
+        df = cache[e_iso]
+        entry_df = df[df["_d"] == entry_date].drop(columns="_d")
+        if entry_df.empty:
+            skipped += 1; continue
+        exit_date = df["_d"].max()                      # contract's last traded day (~expiry)
+        exit_df = df[df["_d"] == exit_date].drop(columns="_d")
+        entry_snap, exit_snap = _eod_snap(entry_df), _eod_snap(exit_df)
+        ref = closes.get(pd.Timestamp(entry_date))
+        if entry_snap is None or exit_snap is None or ref is None:
+            skipped += 1; continue
+        rows.append((entry_date, direction, entry_snap, exit_snap, float(ref),
+                     lot_size_for(entry_date)))
+    return rows, skipped
+
+
+def _price_side(rows, side_fn, cost):
+    """Price every episode under a side policy ``side_fn(regime_dir, i)->'long'/'short'``."""
+    trades = []
+    for i, (d, rdir, en, ex, ref, qty) in enumerate(rows):
+        t = straddle_from_snapshots(en, ex, ref, qty, side_fn(rdir, i), cost, SLIP)
+        if t is not None:
+            trades.append((d, rdir, t))
+    return trades
+
+
+def main():
+    import pandas as pd
+    from engine.data.catalog import Catalog
+    from engine.data.market import MarketData
+    from engine.data.spot import SpotSeries
+    from analysis.regime_finder import label_regimes
+
+    cat = Catalog(ROOT)
+    spot = SpotSeries.from_index(ROOT, "5min")
+    md = MarketData(cat, spot, min_dte=HOLD_MIN_DTE)
+    closes = pd.read_csv(NIFTY_CSV, parse_dates=["date"], index_col="date")["close"]
+    labels = label_regimes(closes).loc[:DATA_END]
+    entries = _episode_entries(labels)
+    rows, skipped = _collect_episode_snapshots(entries, md, cat)
+    cost = CostModel()
+
+    print(f"STRADDLE THERMOMETER — regime GO gate  (hold to >= {HOLD_MIN_DTE}-DTE expiry, "
+          f"slip {SLIP:.2%}, window .. {DATA_END})")
+    print(f"episodes: {len(entries)} labeled, {len(rows)} priced, {skipped} skipped\n")
+
+    # regime strategy: calm->short, stormy->long
+    strat = _price_side(rows, lambda rdir, i: rdir, cost)
+    sells = [t for _d, rd, t in strat if rd == "short"]
+    buys = [t for _d, rd, t in strat if rd == "long"]
+
+    def line(name, trades):
+        s = summarize(trades)
+        print(f"  {name:<16} n={s['n']:>3}  net={s['net']:>12,.0f}  "
+              f"win%={s['win_rate']:>5.0%}  PF={s['profit_factor']:>4.2f}")
+
+    print("REGIME STRATEGY (theta on calm, gamma on storm):")
+    line("SELL/short (calm)", sells)
+    line("BUY/long (storm)", buys)
+    line("COMBINED", [t for _d, _rd, t in strat])
+
+    print("\nNULLS (same episodes, forced side):")
+    line("always-long", [t for _d, _rd, t in _price_side(rows, lambda rd, i: "long", cost)])
+    line("always-short", [t for _d, _rd, t in _price_side(rows, lambda rd, i: "short", cost)])
+    line("random", [t for _d, _rd, t in _price_side(
+        rows, lambda rd, i: "long" if (i % 2 == 0) else "short", cost)])
+
+    # split-half (episodes by entry year)
+    print("\nSPLIT-HALF (combined regime strategy):")
+    early = [t for d, _rd, t in strat if d.year <= 2022]
+    late = [t for d, _rd, t in strat if d.year >= 2023]
+    line("2020-2022", early)
+    line("2023-2026", late)
+
+    # sample guard
+    print(f"\nSAMPLE GUARD (>=3 episodes AND >=... per side): "
+          f"SELL n={len(sells)}, BUY n={len(buys)}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
