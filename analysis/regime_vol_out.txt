@@ -1,0 +1,21 @@
+SHARPENED REGIME DETECTOR — price-wobble + India VIX blend
+labelled 1660 days 2019-10-31..2026-07-17
+(calm needs BOTH price AND VIX quiet; stormy needs EITHER; VIX level warms up after 252d)
+
+STORM DAYS: price-only=499  blended=544  (VIX ADDED 45, removed 0)
+
+SHARPENED STATE CALENDAR counts: {'Mixed_Bull': 382, 'Calm_Bull': 367, 'Stormy_Bull': 346, 'Mixed_Neutral': 192, 'Stormy_Neutral': 116, 'Mixed_Bear': 97, 'Stormy_Bear': 82, 'Calm_Neutral': 51, 'Calm_Bear': 27}
+
+SANITY COVID 2020-02..05 stormy share 85% (need >=50%): PASS
+
+LAST 8 sharpened episodes (>=5d):
+  2026-01-08..2026-01-19    7d  Mixed_Bull       (fear^ at end)
+  2026-02-03..2026-02-26   18d  Stormy_Bull      (fear^ at end)
+  2026-02-27..2026-03-17   12d  Stormy_Neutral   (fear^ at end)
+  2026-03-18..2026-05-04   29d  Stormy_Bear      (fear^ at end)
+  2026-05-11..2026-05-20    8d  Stormy_Bear      (fear^ at end)
+  2026-05-21..2026-06-15   17d  Mixed_Bear       (fear v at end)
+  2026-06-16..2026-06-22    5d  Calm_Bear        (fear v at end)
+  2026-06-24..2026-07-07    9d  Calm_Bear        (fear v at end)
+
+CURRENT (2026-07-17): Calm_Bear  | fear_rising=True
