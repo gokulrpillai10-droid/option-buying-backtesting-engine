@@ -95,11 +95,18 @@ def straddle_trade(strike: int, entry_call: float, entry_put: float,
     ``direction='long'`` buys both legs (profits when premium rises = gamma);
     ``'short'`` sells both legs (profits when premium falls = theta). Adverse
     slippage + the India F&O cost card are applied via ``SpreadPosition.close``.
+
+    ``SpreadLeg.entry`` must be ALREADY entry-slipped by the caller (the engine
+    convention -- ``close`` only slips the exit), so we pre-slip here: a buy pays
+    UP, a sell receives DOWN. Skipping this drops ~half the round-trip slippage.
     """
     action = "buy" if direction == "long" else "sell"
+    entry_slip = (1 + slip) if action == "buy" else (1 - slip)
     legs = (
-        SpreadLeg(action=action, side="CALL", strike=strike, entry=entry_call, qty=qty),
-        SpreadLeg(action=action, side="PUT", strike=strike, entry=entry_put, qty=qty),
+        SpreadLeg(action=action, side="CALL", strike=strike,
+                  entry=entry_call * entry_slip, qty=qty),
+        SpreadLeg(action=action, side="PUT", strike=strike,
+                  entry=entry_put * entry_slip, qty=qty),
     )
     return SpreadPosition(legs=legs).close(
         exit_prices=(exit_call, exit_put), cost_model=cost_model, slip=slip,
@@ -119,13 +126,19 @@ SLIP = 0.0025
 
 def _episode_entries(labels):
     """One entry per regime episode: (entry_date, direction). calm->short (theta),
-    stormy->long (gamma). Episodes are the independent statistical unit."""
-    from analysis.regime_finder import episodes
+    stormy->long (gamma). Episodes are the independent statistical unit.
+
+    Labels are LAGGED (``regime_finder.lagged``) so entry falls on the next
+    executable session -- a live trader acts on yesterday's close-based label, not
+    the same-day EOD. Sides route through ``direction_for`` (single source of truth
+    for the vol-state -> side mapping)."""
+    from analysis.regime_finder import episodes, lagged
+    lab = lagged(labels)
     out = []
-    for s, _e, _d in episodes(labels["stable_low_vol"]):
-        out.append((s.date(), "short"))
-    for s, _e, _d in episodes(labels["high_vol"]):
-        out.append((s.date(), "long"))
+    for s, _e, _d in episodes(lab["stable_low_vol"]):
+        out.append((s.date(), direction_for(stable_low_vol=True, high_vol=False)))
+    for s, _e, _d in episodes(lab["high_vol"]):
+        out.append((s.date(), direction_for(stable_low_vol=False, high_vol=True)))
     return sorted(out)
 
 
@@ -202,12 +215,15 @@ def main():
     rows, skipped = _collect_episode_snapshots(entries, md, cat)
     cost = CostModel()
 
+    # regime strategy: calm->short, stormy->long (price first so the header can
+    # report the ACTUAL priced count -- rows with data can still drop for no
+    # ATM/exit leg inside _price_side).
+    strat = _price_side(rows, lambda rdir, i: rdir, cost)
+
     print(f"STRADDLE THERMOMETER — regime GO gate  (hold to >= {HOLD_MIN_DTE}-DTE expiry, "
           f"slip {SLIP:.2%}, window .. {DATA_END})")
-    print(f"episodes: {len(entries)} labeled, {len(rows)} priced, {skipped} skipped\n")
-
-    # regime strategy: calm->short, stormy->long
-    strat = _price_side(rows, lambda rdir, i: rdir, cost)
+    print(f"episodes: {len(entries)} labeled, {len(rows)} with data, "
+          f"{len(strat)} priced, {skipped} skipped (no contract/day/spot)\n")
     sells = [t for _d, rd, t in strat if rd == "short"]
     buys = [t for _d, rd, t in strat if rd == "long"]
 

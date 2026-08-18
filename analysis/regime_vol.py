@@ -20,12 +20,13 @@ import pandas as pd
 def expanding_percentile(series: pd.Series, min_periods: int = 252) -> pd.Series:
     """Rank of each value within its own trailing history (expanding window).
 
-    Value at ``i`` = share of observations ``<= series[i]`` among ``series[:i+1]``.
-    Look-ahead safe (never sees the future); NaN until ``min_periods`` observations.
+    Value at ``i`` = share of NON-NaN observations ``<= series[i]`` among
+    ``series[:i+1]``. Look-ahead safe (never sees the future); NaN until
+    ``min_periods`` observations. A NaN current value ranks NaN (not 0.0), and
+    NaNs in the window are excluded from the denominator -- so gap days can't be
+    mis-bucketed VIX-low. Vectorized (single pass) via ``Expanding.rank``.
     """
-    return series.expanding(min_periods=min_periods).apply(
-        lambda s: float((s <= s.iloc[-1]).mean()), raw=False
-    )
+    return series.expanding(min_periods=min_periods).rank(pct=True, method="max")
 
 
 def vix_state(pct: float, hi: float = 0.66, lo: float = 0.33):
@@ -78,7 +79,8 @@ def sharpen_labels(closes, vix):
     from analysis.regime_finder import label_regimes, persistence
 
     lab = label_regimes(closes)
-    vix = vix.reindex(lab.index).astype(float)         # align to labelled days
+    vix_full = vix.astype(float)                       # gap-free source series
+    vix = vix_full.reindex(lab.index)                  # align to labelled days (may inject gaps)
     vix_pct = expanding_percentile(vix, min_periods=VIX_PCT_WARMUP)
     vix_hi = vix_pct.apply(lambda p: vix_state(p) == "high")
     vix_lo = vix_pct.apply(lambda p: vix_state(p) == "low")
@@ -94,7 +96,15 @@ def sharpen_labels(closes, vix):
     out["calm"] = mood == "calm"
     out["stable_calm"] = persistence(out["calm"])
     out["stable_stormy"] = persistence(out["stormy"])
-    out["fear_rising"] = fear_rising(vix).reindex(lab.index).fillna(False)
+    # fear direction from the gap-free VIX (a reindex gap must not read as "cooling")
+    out["fear_rising"] = fear_rising(vix_full).reindex(lab.index, fill_value=False)
+
+    # truncate past the VIX-percentile warm-up: calm needs VIX-low, which is
+    # structurally impossible until the percentile is valid (mirrors regime_finder's
+    # own warm-up truncation -- don't emit a not-calm-by-construction leading year).
+    valid = vix_pct.dropna()
+    if len(valid):
+        out = out.loc[valid.index[0]:]
     return out
 
 
@@ -134,11 +144,22 @@ def main():
     state = lab.apply(sharp_state, axis=1)
     print(f"\nSHARPENED STATE CALENDAR counts: {dict(state.value_counts())}")
 
-    # sanity: COVID must read stormy under the blend
+    # sanity: COVID must read stormy. The VIX-blended labels warm up for 252d, so
+    # COVID (2020-02..05) sits inside the blend's warm-up and is truncated out of
+    # `lab` -- the blend has no valid VIX percentile that far back. Check it on the
+    # price-only storm axis (which legitimately covers it) and say so honestly.
     covid = lab.loc["2020-02-20":"2020-05-15"]
     if len(covid):
         share = covid["stormy"].mean()
-        print(f"\nSANITY COVID 2020-02..05 stormy share {share:.0%} (need >=50%): "
+        print(f"\nSANITY COVID 2020-02..05 blended stormy share {share:.0%} "
+              f"(need >=50%): {'PASS' if share >= 0.5 else 'FAIL'}")
+    else:
+        from analysis.regime_finder import label_regimes
+        price = label_regimes(closes).loc["2020-02-20":"2020-05-15", "high_vol"]
+        share = price.mean() if len(price) else float("nan")
+        print(f"\nSANITY COVID 2020-02..05 predates the VIX-blended window "
+              f"(inside the 252d VIX warm-up); checked on PRICE-ONLY axis: "
+              f"stormy share {share:.0%} (need >=50%): "
               f"{'PASS' if share >= 0.5 else 'FAIL'}")
 
     print("\nLAST 8 sharpened episodes (>=5d):")
@@ -146,7 +167,7 @@ def main():
     runs = [(seg.index[0].date(), seg.index[-1].date(), len(seg), seg.iloc[0])
             for _, seg in state.groupby(rid) if len(seg) >= 5]
     for a, b, n, s in runs[-8:]:
-        fr = "fear^" if lab.loc[str(b), "fear_rising"] else "fear v"
+        fr = "fear^" if lab.loc[pd.Timestamp(b), "fear_rising"] else "fear v"
         print(f"  {a}..{b}  {n:>3}d  {s:<16} ({fr} at end)")
 
     print(f"\nCURRENT ({lab.index[-1].date()}): {state.iloc[-1]}  "

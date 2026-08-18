@@ -6,8 +6,9 @@ import numpy as np
 import pandas as pd
 
 from analysis.regime_vol import (
-    expanding_percentile, vix_state, blend_vol, fear_rising,
+    expanding_percentile, vix_state, blend_vol, fear_rising, sharpen_labels,
 )
+from analysis.regime_finder import label_regimes
 
 
 def test_expanding_percentile_is_trailing_and_look_ahead_safe():
@@ -26,6 +27,54 @@ def test_expanding_percentile_warmup_is_nan_before_min_periods():
     p = expanding_percentile(s, min_periods=5)
     assert p.iloc[:4].isna().all()     # not enough history yet
     assert not np.isnan(p.iloc[4])     # 5th obs -> first real percentile
+
+
+def test_expanding_percentile_nan_current_value_is_nan():
+    # #2: a missing current value can't be ranked -> NaN, NOT 0.0 (which would
+    # mis-bucket the day as VIX-low -> spurious calm).
+    s = pd.Series([10.0, 20.0, 30.0, float("nan")])
+    p = expanding_percentile(s, min_periods=1)
+    assert np.isnan(p.iloc[3])
+
+
+def test_expanding_percentile_excludes_nan_from_its_window():
+    # #2: interior NaNs must not inflate the denominator (which biases later
+    # percentiles low -> spurious calm on every post-gap day).
+    s = pd.Series([10.0, 20.0, float("nan"), 30.0, 40.0])
+    p = expanding_percentile(s, min_periods=1)
+    assert p.iloc[3] == 1.0   # 30 vs {10,20,30} = 3/3, not 3/4
+    assert p.iloc[4] == 1.0   # 40 vs {10,20,30,40} = 4/4
+
+
+def _uptrend_closes(n=700):
+    idx = pd.bdate_range("2016-01-01", periods=n)
+    vals = 20000.0 + np.arange(n) * 3.0 + np.sin(np.arange(n) / 7.0) * 40.0
+    return pd.Series(vals, index=idx)
+
+
+def test_sharpen_labels_truncates_the_vix_warmup():
+    # #4: calm needs VIX-low, impossible during the 252d VIX percentile warm-up.
+    # The sharpened labels must be truncated past that warm-up (like regime_finder
+    # truncates its own), not left as a structurally-not-calm leading year.
+    closes = _uptrend_closes()
+    vix = pd.Series(np.linspace(10.0, 40.0, len(closes)), index=closes.index)
+    lab = label_regimes(closes)
+    out = sharpen_labels(closes, vix)
+    assert len(out) < len(lab)            # warm-up rows dropped
+    assert out.index[0] > lab.index[0]    # starts later than the raw price labels
+
+
+def test_fear_rising_is_computed_on_gapfree_vix():
+    # #5: a VIX gap day (missing from the source) must not make a genuinely-rising
+    # day 'lookback' sessions later read as cooling. VIX ramps up monotonically, so
+    # fear_rising should be True everywhere past the lookback -- including after a gap.
+    closes = _uptrend_closes()
+    vix = pd.Series(np.linspace(10.0, 40.0, len(closes)), index=closes.index)
+    lab = label_regimes(closes)
+    gap_day = lab.index[300]
+    after_gap = lab.index[310]            # exactly lookback (10) past the gap -> the broken day
+    out = sharpen_labels(closes, vix.drop(gap_day))
+    assert bool(out.loc[after_gap, "fear_rising"]) is True
 
 
 def test_vix_state_from_percentile():

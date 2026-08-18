@@ -1,14 +1,22 @@
-# Regime detector — code review findings (PENDING FIX)
+# Regime detector — code review findings (FIXED 2026-08-18)
 
-**Date:** 2026-08-17
+**Date:** 2026-08-17 (findings) / 2026-08-18 (fixed + re-run)
 **Reviewed:** `analysis/regime_vol.py`, `analysis/regime_straddle_pnl.py` + their tests
 **Method:** /code-review high-effort workflow (18 agents, independent verify pass) — 13 findings survived verification.
-**Decision:** user chose "fix correctness + re-run" (fixes deferred to next session).
+**Decision:** user chose "fix correctness + re-run".
 
-> Bottom line: the straddle NO-GO verdict and the sharpened labels were both
-> computed WITH these bugs. Conclusions likely hold directionally, but the exact
-> numbers are flattered/corrupted until fixed + re-run. Do NOT trust the committed
-> `_out.txt` numbers until the re-run.
+> **STATUS: all 6 correctness findings + 3 cleanups fixed, test-first (6 new
+> failing→green tests; full suite 79 green), and both drivers re-run.** The
+> directional verdict held: the regime is a NO-GO, short-vol premium dominates.
+> Corrected numbers — straddle COMBINED **PF 0.83 / −122k** (was 0.69/−189k),
+> always-short **PF 1.92** (was 7.78), **48 priced** (was mis-reported 62); sharpened
+> window now **2020-11-03..2026-07-17** (COVID correctly excluded as inside the VIX
+> warm-up; sanity falls back to the price-only axis, still 85% PASS). The `_out.txt`
+> files are now trustworthy.
+
+> Original bottom line (pre-fix): the straddle NO-GO verdict and the sharpened labels
+> were both computed WITH these bugs; the exact numbers were flattered/corrupted until
+> fixed + re-run.
 
 ## Correctness (fix these, test-first)
 

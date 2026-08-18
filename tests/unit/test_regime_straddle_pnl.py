@@ -6,10 +6,15 @@ is deployed on calm/SELL days and profits from theta as premiums decay -- but
 bleeds when a calm patch ends in a gap. These tests pin that sign behaviour and
 the honest cost/slippage treatment, reusing the engine's SpreadPosition math.
 """
+from datetime import date
+
+import pandas as pd
+
 from engine.execution.costs import CostModel
 from engine.position.manager import Trade
 from analysis.regime_straddle_pnl import (
     straddle_trade, direction_for, summarize, atm_strike, straddle_from_snapshots,
+    _episode_entries,
 )
 
 
@@ -72,6 +77,45 @@ def test_slippage_is_adverse_on_both_sides():
     long_clean = straddle_trade(direction="long", slip=0.0, **kw).net
     long_slip = straddle_trade(direction="long", slip=0.0025, **kw).net
     assert long_slip < long_clean   # slip always reduces the realized result
+    short_clean = straddle_trade(direction="short", slip=0.0, **kw).net
+    short_slip = straddle_trade(direction="short", slip=0.0025, **kw).net
+    assert short_slip < short_clean
+
+
+def test_entry_leg_is_slipped_not_just_the_exit():
+    # regression for the half-applied-slippage bug: SpreadLeg.entry must ALREADY be
+    # entry-slipped by the caller. Per-unit debit (Trade.entry) is the entry-side
+    # witness -- it must move adversely with slip for BOTH sides.
+    kw = dict(strike=20000, entry_call=100.0, entry_put=100.0,
+              exit_call=160.0, exit_put=130.0, qty=75, cost_model=CostModel())
+    # LONG legs are buys: entry slip makes you PAY more -> debit rises
+    long_clean_entry = straddle_trade(direction="long", slip=0.0, **kw).entry
+    long_slip_entry = straddle_trade(direction="long", slip=0.0025, **kw).entry
+    assert long_slip_entry > long_clean_entry
+    # SHORT legs are sells: entry slip makes you RECEIVE less -> credit shrinks (debit rises)
+    short_clean_entry = straddle_trade(direction="short", slip=0.0, **kw).entry
+    short_slip_entry = straddle_trade(direction="short", slip=0.0025, **kw).entry
+    assert short_slip_entry > short_clean_entry
+
+
+def test_episode_entries_are_lagged_to_next_session():
+    # #6: enter on the session AFTER the regime label prints (regime_finder.lagged),
+    # not the same-day EOD off a same-day-close label. #8: sides come from the
+    # tested direction_for mapping (calm->short, stormy->long).
+    idx = pd.to_datetime(["2020-01-01", "2020-01-02", "2020-01-03",
+                          "2020-01-06", "2020-01-07"])
+    labels = pd.DataFrame({
+        "stable_low_vol": [False, True, True, False, False],
+        "high_vol":       [False, False, False, True, True],
+    }, index=idx)
+    ents = _episode_entries(labels)
+    # calm episode starts 01-02 -> executable next session 01-03
+    assert (date(2020, 1, 3), "short") in ents
+    # storm episode starts 01-06 -> executable next session 01-07
+    assert (date(2020, 1, 7), "long") in ents
+    # nothing fires on the label day itself
+    assert (date(2020, 1, 2), "short") not in ents
+    assert (date(2020, 1, 6), "long") not in ents
 
 
 def test_direction_for_maps_vol_state_to_side():
