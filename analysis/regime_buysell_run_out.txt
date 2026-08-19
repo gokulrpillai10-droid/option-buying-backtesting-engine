@@ -1,0 +1,35 @@
+NIFTY BUY-vs-SELL REGIME DETECTOR — historical calendar
+window 2019-06-19..2026-08-19  (1771 scored days; BUY=gamma/storm, SELL=theta/calm)
+module coverage (non-null days): {'vol_state': 1682, 'vol_dynamics': 1754, 'iv_rv': 1743, 'vix_level': 1513}
+
+CALENDAR COUNTS (default thr=0.15, min_agree=0.60)
+  raw       : {'BUY': 299, 'SELL': 522, 'NEUTRAL': 961}
+  persisted : {'BUY': 194, 'SELL': 389, 'NEUTRAL': 1199}   (4-of-5 flip-flop guard)
+
+EPISODES (persisted; power-check needs >=3 episodes & >=30 days/side)
+  BUY :  194 days / 27 episodes  (longest 47d)  [PASS]
+  SELL:  389 days / 32 episodes  (longest 78d)  [PASS]
+
+THRESHOLD SENSITIVITY (persisted counts)
+    thr  min_agr     BUY  SELL  NEUTRAL
+   0.10     0.60     194   397     1191
+   0.15     0.60     194   389     1199
+   0.20     0.60     193   384     1205
+   0.25     0.60     186   379     1217
+
+LAST 10 DAYS (persisted bias)
+  2026-08-06  NEUTRAL  (raw NEUTRAL  score -0.484 conf 0.50)
+  2026-08-07  NEUTRAL  (raw SELL     score -0.535 conf 0.75)
+  2026-08-10  NEUTRAL  (raw SELL     score -0.575 conf 0.75)
+  2026-08-11  NEUTRAL  (raw SELL     score -0.471 conf 0.75)
+  2026-08-12  SELL     (raw SELL     score -0.478 conf 0.75)
+  2026-08-13  SELL     (raw SELL     score -0.442 conf 0.75)
+  2026-08-14  SELL     (raw SELL     score -0.471 conf 0.75)
+  2026-08-17  SELL     (raw SELL     score -0.439 conf 0.75)
+  2026-08-18  SELL     (raw SELL     score -0.468 conf 0.75)
+  2026-08-19  SELL     (raw SELL     score -0.487 conf 0.75)
+
+READ
+  Detector is look-ahead safe (prior-close in); skew/breadth deferred (None).
+  This calendar is the detector OUTPUT; the GO/NO-GO verdict comes from the
+  straddle thermometer (analysis/regime_straddle_pnl.py), not from here.
