@@ -1,0 +1,26 @@
+REGIME DETECTOR — ACCURACY TEST (labels lagged +1, no look-ahead)
+window 2020-11-03..2026-08-19  n=1431 days
+(accurate label != profitable trade — regime TIMING is already NO-GO vs always-short)
+
+===== forward horizon = 5 trading days =====
+  VOL-STATE: fwd-vol Stormy=0.95%/d vs Calm=0.57%/d  (Stormy-minus-Calm t=+12.7 **)
+    Stormy->high-vol / Calm->low-vol: acc=65% precision=63% recall=68%  (n=932)
+  DIRECTION: fwd-ret Bull=+0.25% vs Bear=+0.82%  (Bull-minus-Bear t=-3.0 **)
+    Bull->up hit=58% (n=1034)   Bear->down hit=40% (n=138)
+
+===== forward horizon = 10 trading days =====
+  VOL-STATE: fwd-vol Stormy=0.98%/d vs Calm=0.61%/d  (Stormy-minus-Calm t=+15.6 **)
+    Stormy->high-vol / Calm->low-vol: acc=72% precision=67% recall=76%  (n=927)
+  DIRECTION: fwd-ret Bull=+0.47% vs Bear=+1.63%  (Bull-minus-Bear t=-4.7 **)
+    Bull->up hit=59% (n=1034)   Bear->down hit=29% (n=133)
+
+===== persistence / stability =====
+  same combined state tomorrow: 86%
+  calm    P(still calm tomorrow)=90%   episodes=48  avg length=9.5d
+  stormy  P(still stormy tomorrow)=93%   episodes=36  avg length=13.4d
+  bull    P(still bull tomorrow)=98%   episodes=18  avg length=57.4d
+  bear    P(still bear tomorrow)=97%   episodes=5  avg length=28.8d
+
+===== label horizon (today's label persisting N days out) =====
+  h= 5d: same combined state=67%   |  calm=76%  stormy=81%  bull=96%  bear=92%
+  h=10d: same combined state=53%   |  calm=68%  stormy=68%  bull=94%  bear=87%
