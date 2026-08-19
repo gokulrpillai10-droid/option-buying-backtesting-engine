@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import pandas as pd
 
+from analysis.regime_data import load_closes_vix
+
 
 def expanding_percentile(series: pd.Series, min_periods: int = 252) -> pd.Series:
     """Rank of each value within its own trailing history (expanding window).
@@ -60,12 +62,9 @@ def fear_rising(vix: pd.Series, lookback: int = 10) -> pd.Series:
     (vs cooling). Trailing/look-ahead safe."""
     return vix > vix.shift(lookback)
 
-
 # ------------------------------------------------------------------ #
 # Driver: build the sharpened labels + report (pure helpers above are tested)
 # ------------------------------------------------------------------ #
-NIFTY_CSV = "analysis/nifty_daily.csv"
-VIX_CSV = "analysis/india_vix.csv"
 VIX_PCT_WARMUP = 252     # 1y before VIX level is judged high/low
 
 
@@ -124,8 +123,7 @@ def main():
     import sys
     import pandas as pd
 
-    closes = pd.read_csv(NIFTY_CSV, parse_dates=["date"], index_col="date")["close"]
-    vix = pd.read_csv(VIX_CSV, parse_dates=["date"], index_col="date")["close"]
+    closes, vix = load_closes_vix()
     lab = sharpen_labels(closes, vix)
 
     print("SHARPENED REGIME DETECTOR — price-wobble + India VIX blend")

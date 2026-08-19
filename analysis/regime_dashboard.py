@@ -20,8 +20,7 @@ from analysis.regime_finder import label_regimes
 from analysis.regime_vol import (expanding_percentile, sharpen_labels,
                                  sharp_state, VIX_PCT_WARMUP)
 
-NIFTY_CSV = "analysis/nifty_daily.csv"
-VIX_CSV = "analysis/india_vix.csv"
+from analysis.regime_data import load_closes_vix
 STRADDLE_OUT = "analysis/regime_straddle_pnl_out.txt"
 OUT_HTML = "analysis/regime_dashboard.html"
 
@@ -30,8 +29,7 @@ OUT_HTML = "analysis/regime_dashboard.html"
 # factor + result extraction
 # ------------------------------------------------------------------ #
 def _live_factors():
-    closes = pd.read_csv(NIFTY_CSV, parse_dates=["date"], index_col="date")["close"]
-    vix = pd.read_csv(VIX_CSV, parse_dates=["date"], index_col="date")["close"]
+    closes, vix = load_closes_vix()
 
     lab = label_regimes(closes)
     returns = closes.pct_change()

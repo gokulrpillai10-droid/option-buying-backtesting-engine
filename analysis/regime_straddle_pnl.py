@@ -17,6 +17,8 @@ import sys
 from engine.execution.costs import CostModel
 from engine.position.manager import SpreadLeg, SpreadPosition, Trade
 
+from analysis.regime_data import load_closes
+
 
 def atm_strike(snapshot, ref_price: float):
     """Nearest strike to ``ref_price`` where BOTH the call and put are traded,
@@ -118,7 +120,6 @@ def straddle_trade(strike: int, entry_call: float, entry_put: float,
 # Real-data driver (research entry point; pure helpers above are tested)
 # ------------------------------------------------------------------ #
 ROOT = "/Users/gokul/Desktop/tradealgo/data nifty "
-NIFTY_CSV = "analysis/nifty_daily.csv"
 DATA_END = "2026-02-25"          # option chain ends here
 HOLD_MIN_DTE = 21                # enter a contract with >=21 DTE, hold to its expiry
 SLIP = 0.0025
@@ -156,7 +157,7 @@ def _collect_episode_snapshots(entries, md, cat):
     import pandas as pd
     from engine.instruments import lot_size_for
 
-    closes = pd.read_csv(NIFTY_CSV, parse_dates=["date"], index_col="date")["close"]
+    closes = load_closes()
     cache = {}
     rows, skipped = [], 0
     for entry_date, direction in entries:
@@ -198,7 +199,6 @@ def _price_side(rows, side_fn, cost):
 
 
 def main():
-    import pandas as pd
     from engine.data.catalog import Catalog
     from engine.data.market import MarketData
     from engine.data.spot import SpotSeries
@@ -207,7 +207,7 @@ def main():
     cat = Catalog(ROOT)
     spot = SpotSeries.from_index(ROOT, "5min")
     md = MarketData(cat, spot, min_dte=HOLD_MIN_DTE)
-    closes = pd.read_csv(NIFTY_CSV, parse_dates=["date"], index_col="date")["close"]
+    closes = load_closes()
     labels = label_regimes(closes).loc[:DATA_END]
     entries = _episode_entries(labels)
     rows, skipped = _collect_episode_snapshots(entries, md, cat)

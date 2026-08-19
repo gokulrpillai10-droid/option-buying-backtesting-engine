@@ -16,8 +16,7 @@ import pandas as pd
 from analysis.regime_accuracy import forward_drawdown, forward_return, welch_t
 from analysis.regime_vol import expanding_percentile
 
-NIFTY_CSV = "analysis/nifty_daily.csv"
-VIX_CSV = "analysis/india_vix.csv"
+from analysis.regime_data import load_closes_vix
 BREADTH_CSV = "analysis/nifty_breadth_daily.csv"
 FACTORS_CSV = "analysis/vol_surface_daily.csv"
 W = 10
@@ -38,8 +37,7 @@ def _tercile_t(x: pd.Series, y: pd.Series, low_is_signal: bool):
 
 
 def main():
-    closes = pd.read_csv(NIFTY_CSV, parse_dates=["date"], index_col="date")["close"]
-    vix = pd.read_csv(VIX_CSV, parse_dates=["date"], index_col="date")["close"]
+    closes, vix = load_closes_vix()
     breadth = pd.read_csv(BREADTH_CSV, parse_dates=["date"], index_col="date")["breadth"]
     skew = pd.read_csv(FACTORS_CSV, parse_dates=["date"], index_col="date")["skew"]
 

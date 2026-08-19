@@ -20,8 +20,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-NIFTY_CSV = "analysis/nifty_daily.csv"
-VIX_CSV = "analysis/india_vix.csv"
+from analysis.regime_data import load_closes_vix
 WINDOWS = (5, 10)
 
 
@@ -84,8 +83,7 @@ def main():
     from analysis.regime_finder import lagged, episodes
     from analysis.regime_vol import sharpen_labels, sharp_state
 
-    closes = pd.read_csv(NIFTY_CSV, parse_dates=["date"], index_col="date")["close"]
-    vix = pd.read_csv(VIX_CSV, parse_dates=["date"], index_col="date")["close"]
+    closes, vix = load_closes_vix()
     lab = sharpen_labels(closes, vix)                 # the ACTUAL detector output
     lagl = lagged(lab)                                # act on yesterday's label
 

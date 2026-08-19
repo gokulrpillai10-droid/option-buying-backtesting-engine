@@ -12,6 +12,11 @@ complements analysis/regime_accuracy.py (the historical estimate). Idempotent:
 re-running the same day updates today's row and re-grades matured ones.
 
 State: analysis/regime_forward_journal.csv (one row per prediction date).
+
+Note on the repo `_out.txt` convention: this is a LIVE, stateful logger (its
+scorecard changes every session as predictions mature and the journal grows), not
+a deterministic study driver. Like the live-Kite tools, it has no meaningful
+frozen `_out.txt` snapshot to commit — the committed journal CSV is its artifact.
 """
 from __future__ import annotations
 
@@ -21,8 +26,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
-NIFTY_CSV = "analysis/nifty_daily.csv"
-VIX_CSV = "analysis/india_vix.csv"
+from analysis.regime_data import load_closes_vix
 JOURNAL = "analysis/regime_forward_journal.csv"
 HORIZONS = (5, 10)
 
@@ -94,8 +98,7 @@ def _grade_rows(j: pd.DataFrame, closes) -> pd.DataFrame:
 
 
 def run():
-    closes = pd.read_csv(NIFTY_CSV, parse_dates=["date"], index_col="date")["close"]
-    vix = pd.read_csv(VIX_CSV, parse_dates=["date"], index_col="date")["close"]
+    closes, vix = load_closes_vix()
 
     pred = _predict_today(closes, vix)
     if os.path.exists(JOURNAL) and os.path.getsize(JOURNAL) > 0:

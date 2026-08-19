@@ -31,9 +31,9 @@ import pandas as pd
 from analysis.chain_daily import front_weekly_eod_snapshot
 from analysis.oi_features import pcr, max_pain, oi_walls, classify_buildup
 from analysis.regime_straddle_pnl import atm_strike
+from analysis.regime_data import load_closes
 
 ROOT = "/Users/gokul/Desktop/tradealgo/data nifty "
-NIFTY_CSV = "analysis/nifty_daily.csv"
 QUARANTINE_FILE = "analysis/quarantine_days.json"
 START = date(2020, 2, 1)
 DATA_END = date(2026, 2, 25)          # option chain ends here
@@ -78,7 +78,7 @@ def build_rows():
     feat_md = MarketData(cat, spot, min_dte=0, quarantine=q)    # front weekly, pin window
     tgt_md = MarketData(cat, spot, min_dte=1, quarantine=q)     # overnight-survivable
 
-    closes = pd.read_csv(NIFTY_CSV, parse_dates=["date"], index_col="date")["close"]
+    closes = load_closes()
     days = [d.date() for d in closes.index
             if START <= d.date() <= DATA_END and d.date() not in q]
 

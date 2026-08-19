@@ -22,8 +22,7 @@ from analysis.regime_accuracy import welch_t, forward_realized_vol
 
 FACTORS_CSV = "analysis/vol_surface_daily.csv"
 BREADTH_CSV = "analysis/nifty_breadth_daily.csv"
-NIFTY_CSV = "analysis/nifty_daily.csv"
-VIX_CSV = "analysis/india_vix.csv"
+from analysis.regime_data import load_closes, load_vix
 OUT_CSV = "analysis/vol_surface_regime.csv"
 COMPOSITE = ["skew", "atm_iv", "term", "accel", "breadth"]   # vrp dropped (noise)
 INVERT = {"breadth": True}       # LOW breadth (few stocks healthy) = stress
@@ -95,7 +94,7 @@ def main():
     out = label_series()
     out.to_csv(OUT_CSV)
 
-    closes = pd.read_csv(NIFTY_CSV, parse_dates=["date"], index_col="date")["close"]
+    closes = load_closes()
     fvol = forward_realized_vol(closes, 10); fvol.index = fvol.index.date
     f = fvol.reindex(pd.to_datetime(out.index).date)
     f.index = out.index
@@ -117,7 +116,7 @@ def main():
 
     # --- incremental to VIX: does it separate WITHIN the middle-VIX days? ---
     from analysis.regime_vol import expanding_percentile
-    vix = pd.read_csv(VIX_CSV, parse_dates=["date"], index_col="date")["close"]
+    vix = load_vix()
     vix.index = vix.index.date
     vpct = expanding_percentile(vix.reindex(pd.to_datetime(out.index).date).astype(float), WARMUP)
     vpct.index = out.index

@@ -27,8 +27,7 @@ from analysis.vol_surface_features import atm_iv, skew, annualized_realized_vol
 from analysis.regime_accuracy import welch_t, forward_realized_vol
 
 ROOT = "/Users/gokul/Desktop/tradealgo/data nifty "
-NIFTY_CSV = "analysis/nifty_daily.csv"
-VIX_CSV = "analysis/india_vix.csv"
+from analysis.regime_data import load_closes, load_vix
 QUARANTINE_FILE = "analysis/quarantine_days.json"
 OUT_CSV = "analysis/vol_surface_daily.csv"
 START = date(2020, 2, 1)
@@ -57,8 +56,8 @@ def build():
     q = load_quarantine(QUARANTINE_FILE)
     md = MarketData(cat, spot, min_dte=MIN_DTE, quarantine=q)
 
-    closes = pd.read_csv(NIFTY_CSV, parse_dates=["date"], index_col="date")["close"]
-    vix = pd.read_csv(VIX_CSV, parse_dates=["date"], index_col="date")["close"] / 100.0
+    closes = load_closes()
+    vix = load_vix() / 100.0
     rvol = annualized_realized_vol(closes, RV_WINDOW)
     days = [d.date() for d in closes.index
             if START <= d.date() <= DATA_END and d.date() not in q]
@@ -94,7 +93,7 @@ def _load_or_build():
 
 def main():
     df = _load_or_build()
-    closes = pd.read_csv(NIFTY_CSV, parse_dates=["date"], index_col="date")["close"]
+    closes = load_closes()
     fvol = forward_realized_vol(closes, 10)
     fvol.index = fvol.index.date
     f = fvol.reindex(df.index)
