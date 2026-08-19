@@ -57,13 +57,23 @@ def classify(as_of, closes=None, vix=None, snapshot=None, ref_price=None,
     closes = closes[closes.index < as_of]
     vix = vix[vix.index < as_of]
 
+    # The skew snapshot carries its own as-of stamp; a caller must hand us the
+    # prior-close chain, never today's. Enforce it rather than trust it.
+    use_skew = snapshot is not None and ref_price is not None
+    if use_skew:
+        stamp = getattr(snapshot, "as_of", None)
+        if stamp is not None and pd.Timestamp(stamp) >= as_of:
+            raise ValueError(
+                f"skew snapshot stamped {pd.Timestamp(stamp)} >= as_of {as_of} "
+                f"(look-ahead leak)")
+
     labels = label_regimes(closes, **(label_kwargs or {}))
     modules = {
         "vol_state": _last(vol_state(labels)),
         "vol_dynamics": _last(vol_dynamics(vix)),
         "iv_rv": _last(iv_rv_ratio(vix, closes)),
         "vix_level": _last(vix_percentile(vix)),
-        "skew": skew(snapshot, ref_price) if (snapshot is not None and ref_price is not None) else None,
+        "skew": skew(snapshot, ref_price) if use_skew else None,
         "breadth": breadth_score(),
     }
     comp = composite(modules, weights=weights, thr=thr, min_agreement=min_agreement)

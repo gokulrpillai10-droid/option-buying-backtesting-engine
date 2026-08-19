@@ -44,6 +44,11 @@ class OptionChainSnapshot:
         self._dt = dt
         self._frame = frame.set_index("StrikePrice")
 
+    @property
+    def as_of(self) -> datetime:
+        """The timestamp this snapshot was taken at (its explicit as-of stamp)."""
+        return self._dt
+
     def strikes(self) -> List[int]:
         return sorted(int(s) for s in self._frame.index)
 
