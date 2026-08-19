@@ -1,0 +1,14 @@
+BREADTH / SKEW vs forward 10d DRAWDOWN & RETURN  (incremental to VIX)
+signal tercile = low breadth / high skew (the 'stress' side)
+
+test                scope        signal    other      t  verdict
+breadth->drawdown   all          -2.26%   -1.19%   -6.1  significant
+breadth->drawdown   mid-VIX      -1.66%   -1.38%   -1.4  -
+breadth->return     all           0.13%    0.72%   -2.7  -
+breadth->return     mid-VIX       0.48%    0.86%   -1.3  -
+skew->drawdown      all          -2.12%   -1.42%   -3.4  significant
+skew->drawdown      mid-VIX      -1.67%   -1.62%   -0.2  -
+skew->return        all           0.86%    0.09%    3.0  significant
+skew->return        mid-VIX       0.78%    0.26%    1.7  -
+
+VERDICT: NO-GO — neither breadth nor skew adds drawdown/return signal beyond VIX

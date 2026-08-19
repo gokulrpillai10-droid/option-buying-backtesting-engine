@@ -6,7 +6,15 @@ import pandas as pd
 
 from analysis.regime_accuracy import (
     forward_return, forward_realized_vol, confusion, welch_t, horizon_persistence,
+    forward_drawdown,
 )
+
+
+def test_forward_drawdown_is_worst_next_window_dip():
+    c = pd.Series([100.0, 110.0, 90.0, 95.0])
+    dd = forward_drawdown(c, window=2)
+    assert round(dd.iloc[0], 4) == -0.10       # min(110,90)=90 -> 90/100-1
+    assert np.isnan(dd.iloc[-1])               # no future left
 
 
 def test_horizon_persistence_conditions_on_holding_today():

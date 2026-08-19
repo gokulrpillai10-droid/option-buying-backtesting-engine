@@ -1,0 +1,12 @@
+VOL-SURFACE FACTORS — forward-vol predictive gate (next-10d realized vol)
+n=1491 days 2020-02-03..2026-02-25  (min_dte=3)
+GATE: a factor earns further work only at |t| >= 3 on its top-vs-bottom tercile of forward vol.
+
+factor         mean  top-3ile fvol  bot-3ile fvol      t  verdict
+atm_iv        0.162          1.32%          0.61%   16.0  ** forecasts vol
+skew          0.023          1.27%          0.70%   12.4  ** forecasts vol
+vrp           1.150          0.99%          0.91%    1.8  noise (|t|<3)
+term         -0.012          1.07%          0.89%    3.6  ** forecasts vol
+accel        -0.000          1.09%          0.88%    4.1  ** forecasts vol
+
+VERDICT: GO — a vol-surface factor forecasts vol; proceed to breadth + composite

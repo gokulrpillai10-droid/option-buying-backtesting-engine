@@ -1,0 +1,15 @@
+VOL-SURFACE COMPOSITE REGIME — Complacent / Normal / Stressed
+factors=skew+atm_iv+term+accel+breadth (vrp dropped as noise)  n=1224 days 2021-02-12..2026-02-25
+
+forward 10d realized vol by regime (does the label separate future vol?):
+  Complacent  n= 518  fwd-vol=0.66%/d
+  Normal      n= 479  fwd-vol=0.81%/d
+  Stressed    n= 227  fwd-vol=1.01%/d
+  Stressed-minus-Complacent t=+11.2 ** real separation
+
+INCREMENTAL vs VIX (within middle-VIX days only, VIX ambiguous):
+  Stressed fwd-vol=0.76% (n=84) vs Complacent=0.80% (n=92)  t=-1.0 (no clear add over VIX)
+
+BREADTH alone vs VIX (within middle-VIX days): low-breadth fwd-vol=0.80% (n=116) vs high-breadth=0.79% (n=122)  t=+0.2 (no add over VIX)
+
+CURRENT (2026-02-25): Normal  (stress 6/10; skew +0.014, atm_iv 0.121, term -0.014, breadth 69%)

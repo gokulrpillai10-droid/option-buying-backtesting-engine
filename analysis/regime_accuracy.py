@@ -39,6 +39,13 @@ def forward_realized_vol(closes: pd.Series, window: int) -> pd.Series:
     return rets.rolling(window).std().shift(-window)
 
 
+def forward_drawdown(closes: pd.Series, window: int) -> pd.Series:
+    """Worst (most negative) return over the NEXT ``window`` days -- the biggest
+    dip from today's close within the window. NaN past the end."""
+    mins = pd.concat([closes.shift(-k) for k in range(1, window + 1)], axis=1).min(axis=1)
+    return mins / closes - 1.0
+
+
 def confusion(pred: pd.Series, actual: pd.Series) -> dict:
     """accuracy / precision / recall for aligned boolean predict vs actual."""
     d = pd.DataFrame({"p": pred, "a": actual}).dropna()
