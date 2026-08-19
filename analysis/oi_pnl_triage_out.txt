@@ -1,0 +1,21 @@
+OI PREDICTIVE-POWER TRIAGE — daily OI feature vs next-day SHORT-straddle P&L (premium pts)
+window 2020-02-01..2026-02-25  |  n=1162 priced days, 338 skipped, 1 quarantined
+BASELINE (always-short, unconditional): mean=+3.06 pts  win%=67%  t=+1.5  (the edge OI must BEAT; note it is itself only marginally significant)
+GATE: a feature earns a GO only at |t| >= 3 on the top-vs-bottom tercile (or class-vs-rest) spread — ~11 comparisons, so a strict bar.
+
+feature            corr  top-3ile  bot-3ile   spread      t  verdict
+pcr_all            0.03       6.2       1.0      5.2    1.1  noise (|t|<3)
+pcr_band           0.06       6.1       2.8      3.3    0.6  noise (|t|<3)
+max_pain_dist      0.00      -1.3       5.6     -6.9   -1.2  noise (|t|<3)
+call_wall_dist    -0.02       4.4       0.7      3.7    0.7  noise (|t|<3)
+put_wall_dist     -0.03      -1.1       8.0     -9.1   -1.7  noise (|t|<3)
+d_pcr             -0.04       2.8      11.4     -8.6   -1.5  noise (|t|<3)
+
+BUILDUP class (mean next-day short P&L; t = class vs the rest):
+  flat             n= 316  mean=-7.98  (t vs rest -2.9)
+  long_buildup     n= 363  mean=+6.60  (t vs rest +1.2)
+  long_unwinding   n= 104  mean=+0.32  (t vs rest -0.5)
+  short_buildup    n= 263  mean=+10.66  (t vs rest +2.0)
+  short_covering   n= 116  mean=+7.28  (t vs rest +0.9)
+
+VERDICT: NO-GO — no OI feature clears the significance bar; do NOT build the subsystem. Linear power ~0; tercile/class spreads are within noise.

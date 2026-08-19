@@ -143,12 +143,10 @@ def _episode_entries(labels):
 
 
 def _eod_snap(day_df):
-    """(snapshot, dt) at the session's last minute for a single-day chain frame."""
-    from engine.data.chain import Chain
-    if day_df.empty:
-        return None
-    eod = day_df["DateTime"].max()
-    return Chain(day_df).snapshot_at(eod)
+    """(snapshot at the session's last minute) for a single-day chain frame.
+    Delegates to the shared helper (DRY with the OI study)."""
+    from analysis.chain_daily import eod_snapshot
+    return eod_snapshot(day_df)
 
 
 def _collect_episode_snapshots(entries, md, cat):
