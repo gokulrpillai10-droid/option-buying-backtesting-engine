@@ -13,6 +13,8 @@ from typing import List, Optional
 
 import pandas as pd
 
+from engine.data.integrity import assert_unique_strikes
+
 
 @dataclass(frozen=True)
 class OptionQuote:
@@ -42,6 +44,7 @@ class OptionChainSnapshot:
 
     def __init__(self, dt: datetime, frame: pd.DataFrame):
         self._dt = dt
+        assert_unique_strikes(frame)          # hot-path scoping guard (hard-fail)
         self._frame = frame.set_index("StrikePrice")
 
     @property
