@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 
 from engine.data.integrity import (
-    IntegrityError, one_row, check_single_day, check_session_bounds,
+    IntegrityError, one_row, at_most_one_row, check_single_day, check_session_bounds,
     check_snapshot, check_call_monotone, scoped_day, snapshot_at,
 )
 
@@ -63,6 +63,14 @@ def test_one_row_requires_exactly_one():
     dup = pd.concat([df, df], ignore_index=True)
     with pytest.raises(IntegrityError, match="exactly 1"):
         one_row(dup, StrikePrice=21700)                      # two rows
+
+
+def test_at_most_one_row_allows_zero_fails_on_many():
+    df = _snap(datetime(2024, 1, 4, 14, 0), [21600, 21700], 21650)
+    assert at_most_one_row(df, StrikePrice=21700)["CallClose"] == df.set_index("StrikePrice").loc[21700, "CallClose"]
+    assert at_most_one_row(df, StrikePrice=99999) is None    # missing is legitimate -> None
+    with pytest.raises(IntegrityError, match="<=1"):
+        at_most_one_row(pd.concat([df, df], ignore_index=True), StrikePrice=21700)
 
 
 # ---- monotonicity (gross non-monotone = mixed context) ----------------------- #

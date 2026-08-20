@@ -14,6 +14,7 @@ from typing import Optional, Tuple
 import pandas as pd
 
 from engine.data.chain import Chain
+from engine.data.integrity import scoped_day
 
 
 def eod_snapshot(day_df: pd.DataFrame):
@@ -41,9 +42,7 @@ def front_weekly_eod_snapshot(day: date, md, cat, cache: dict
     if e_iso not in cache:
         df = pd.read_parquet(path)
         df["DateTime"] = pd.to_datetime(df["DateTime"])
-        df["_d"] = df["DateTime"].dt.date
         cache[e_iso] = df
-    df = cache[e_iso]
-    day_df = df[df["_d"] == day].drop(columns="_d")
+    day_df = scoped_day(cache[e_iso], day)        # guarded: single-day + session invariants
     snap = eod_snapshot(day_df)
     return (snap, E) if snap is not None else (None, None)

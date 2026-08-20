@@ -19,6 +19,7 @@ import pandas as pd
 from datetime import datetime, time, date
 
 from engine.data.catalog import Catalog
+from engine.data.integrity import at_most_one_row
 from engine.execution.costs import CostModel
 
 ROOT = "/Users/gokul/Desktop/tradealgo/data nifty "
@@ -141,10 +142,10 @@ def process_day(bars, filt=None):
 
 
 def call_close(day, ts, strike):
-    row = day[(day["DateTime"] == ts) & (day["StrikePrice"] == strike)]
-    if row.empty:
+    row = at_most_one_row(day, DateTime=ts, StrikePrice=strike)   # guarded: fails on duplicate context
+    if row is None:
         return None
-    v = float(row.iloc[0]["CallClose"])
+    v = float(row["CallClose"])
     return v if v > 0 else None
 
 

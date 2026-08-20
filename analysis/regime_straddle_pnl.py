@@ -18,6 +18,7 @@ from engine.execution.costs import CostModel
 from engine.position.manager import SpreadLeg, SpreadPosition, Trade
 
 from analysis.regime_data import load_closes
+from engine.data.integrity import scoped_day
 
 
 def atm_strike(snapshot, ref_price: float):
@@ -206,14 +207,13 @@ def _collect_episode_snapshots(entries, md, cat):
         if e_iso not in cache:
             df = pd.read_parquet(path)
             df["DateTime"] = pd.to_datetime(df["DateTime"])
-            df["_d"] = df["DateTime"].dt.date
             cache[e_iso] = df
         df = cache[e_iso]
-        entry_df = df[df["_d"] == entry_date].drop(columns="_d")
+        entry_df = scoped_day(df, entry_date)          # guarded: single-day + session invariants
         if entry_df.empty:
             skipped += 1; continue
-        exit_date = df["_d"].max()                      # contract's last traded day (~expiry)
-        exit_df = df[df["_d"] == exit_date].drop(columns="_d")
+        exit_date = df["DateTime"].dt.date.max()        # contract's last traded day (~expiry)
+        exit_df = scoped_day(df, exit_date)
         entry_snap, exit_snap = _eod_snap(entry_df), _eod_snap(exit_df)
         ref = closes.get(pd.Timestamp(entry_date))
         if entry_snap is None or exit_snap is None or ref is None:

@@ -114,13 +114,27 @@ def one_row(frame, strict: bool = True, **where):
     return sub.iloc[0]
 
 
+def at_most_one_row(frame, strict: bool = True, **where):
+    """Return the single row matching ``where``, or None if there are none. Hard-fail
+    only on >1 (a duplicate == mixed-context leak). For optional lookups where a
+    missing strike/timestamp is legitimate (unlike ``one_row`` which requires one)."""
+    mask = pd.Series(True, index=frame.index)
+    for k, v in where.items():
+        mask &= (frame[k] == v)
+    sub = frame[mask]
+    if len(sub) > 1:
+        _fail(f"expected <=1 row for {where}, got {len(sub)}", strict)
+    return sub.iloc[0] if len(sub) >= 1 else None
+
+
 def scoped_day(source, date, strict: bool = True) -> pd.DataFrame:
     """Read/scope an option-chain source to a SINGLE calendar day, with invariants.
     ``source`` is a parquet path or an already-loaded DataFrame. This is the one
     sanctioned way to go from a whole-contract parquet to a day frame."""
     df = source if isinstance(source, pd.DataFrame) else pd.read_parquet(source)
-    df = df.copy()
-    df["DateTime"] = pd.to_datetime(df["DateTime"])
+    if not pd.api.types.is_datetime64_any_dtype(df["DateTime"]):
+        df = df.copy()                                    # only copy when we must reparse
+        df["DateTime"] = pd.to_datetime(df["DateTime"])
     day = df[df["DateTime"].dt.date == pd.Timestamp(date).date()]
     check_single_day(day, strict)
     check_session_bounds(day, strict)

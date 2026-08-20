@@ -9,7 +9,7 @@ Anchoring (the fix vs g12_ce_engine_rerun.py):
   - INVALIDATION (Q1=b): if price rallies back ABOVE the locked swing high before any
     entry, the down-move is dead -> unlock and resume tracking a fresh running high.
   - ENTRY (Q2): after price trades BELOW 0.44, the first 5-min candle that CLOSES above
-    0.44 -> buy deep-ITM call (floor(spot/50)*50-150), window 10:00-12:15.
+    0.44 -> buy deep-ITM call (floor(spot/50)*50-150), window open-13:45.
   - Exits: 0.22 stop / 0.77,1.00 targets / trail 12 prem-pts after 1.22 / EOD 15:15.
   - Post-trade (assumption): max 2 trades/day; 0.22 stop ends the day; trail-exit allows
     one re-entry on the same locked fib.
@@ -17,11 +17,13 @@ Anchoring (the fix vs g12_ce_engine_rerun.py):
 Runs on OUR Forward 5-min, prices from OUR Data-v3, our CostModel + slippage. Both
 CORE (no F-filters) and FILTERED (F1/F2/F3/F6/F7/F8/F9) reported.
 """
+import os
 import numpy as np
 import pandas as pd
 from datetime import time, date
 
 from engine.data.catalog import Catalog
+from engine.data.integrity import at_most_one_row
 from engine.execution.costs import CostModel
 
 ROOT = "/Users/gokul/Desktop/tradealgo/data nifty "
@@ -29,6 +31,21 @@ LOTS = 3
 MIN_DROP, DELTA, TRAIL_PREM = 80.0, 0.70, 12.0
 SLIP, STOP_EXTRA = 1.5, 2.0
 CM = CostModel()
+
+
+def _parse_t(s):
+    try:
+        hh, mm = s.split(":")
+        return time(int(hh), int(mm))
+    except (ValueError, TypeError):
+        raise SystemExit(f"invalid time {s!r} (expected HH:MM, e.g. 10:00)")
+
+
+# Entry window (env-overridable). Default: no morning floor, 13:45 cutoff.
+# Set G12_EA=10:00 G12_EB=12:15 to reproduce the original window.
+# Empty or unset -> default (EA=None means no morning floor).
+EA = _parse_t(os.environ["G12_EA"]) if os.environ.get("G12_EA") else None
+EB = _parse_t(os.environ.get("G12_EB") or "13:45")
 
 
 def lot_size(d):
@@ -51,7 +68,7 @@ def five_min_bars(fwd1):
 
 
 def process_day(bars, filt=None):
-    EA, EB, EOD = time(10, 0), time(12, 15), time(15, 15)
+    EOD = time(15, 15)
     trades = []
     locked = False
     swing_high, running_low, swing_low, fib = -np.inf, np.inf, None, None
@@ -117,7 +134,7 @@ def process_day(bars, filt=None):
             below_044 = True
         if sl_done or tcount >= 2 or not below_044:
             continue
-        if tt < EA or tt >= EB:
+        if (EA is not None and tt < EA) or tt >= EB:
             continue
         if c > fib["f044"]:
             if filt is not None:
@@ -137,10 +154,10 @@ def process_day(bars, filt=None):
 
 
 def call_close(day, ts, strike):
-    row = day[(day["DateTime"] == ts) & (day["StrikePrice"] == strike)]
-    if row.empty:
+    row = at_most_one_row(day, DateTime=ts, StrikePrice=strike)   # guarded: fails on duplicate context
+    if row is None:
         return None
-    v = float(row.iloc[0]["CallClose"])
+    v = float(row["CallClose"])
     return v if v > 0 else None
 
 
@@ -166,7 +183,10 @@ def main():
     cat = Catalog(ROOT)
     exp_dates = sorted(pd.Timestamp(e).date() for e in cat.expiries())
     daily = pd.read_csv("analysis/daily_underlying.csv", parse_dates=["date"]).sort_values("date")
-    daily["prev_high"] = daily["high"].shift(1)
+    daily["prev_high"] = daily["high"].shift(1)  # computed on full history, before any window filter
+    _start = os.environ.get("G12_START")
+    if _start:
+        daily = daily[daily["date"] >= pd.Timestamp(_start)]
     ctx = {r["date"].date(): (r["prev_high"], r["prev_close"], r["open"]) for _, r in daily.iterrows()}
     dates = [d.date() for d in daily["date"]]
 
