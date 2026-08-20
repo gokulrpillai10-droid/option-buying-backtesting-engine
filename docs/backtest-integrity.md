@@ -77,5 +77,15 @@ cpr_reference.csv` to activate `tests/integrity/test_cpr_parity.py`.
 - [x] Step 3 — CPR silver audit: **reproduces `_out.txt` bit-for-bit under the
   guarded engine, 0 invariant trips** (net +744,824, Sharpe 1.08, DD −122,916,
   2020-01→2026-02). Gold-pending on `analysis/cpr_reference.csv`; parity fixture stubbed.
-- [ ] Step 4 — switch all 26 raw-parquet scripts to the guarded reader (stakes-ordered)
+- [~] Step 4 — switch all 26 raw-parquet scripts to the guarded reader (stakes-ordered):
+  - [x] Batch 1 (commit 2e62060, no findings): regime_straddle_pnl (scoped_day →
+    reproduces _out.txt), chain_daily seam (front_weekly → scoped_day, protects
+    oi/vol_surface), g12_ce_corrected + g12_ce_engine_rerun (call_close →
+    at_most_one_row), g12_ce_spot (already date+strike scoped, no change),
+    cpr_reversal_features (reproduces _out.txt; aggregate reads, safe).
+  - [ ] Batch 2+: ema_crossover_5min/_study/_v3/_v4/_v5, orb_study, combined_backtest,
+    regime_analysis, iv_timing_study, buying_triage, flow_signal_study,
+    put_premium_test, failed_call_reversal, mean_reversion_triage,
+    gap_down_continuation, hdfc_gapandgo/_patterns/_sr_levels/_sr_multiframe,
+    expiry_strangle_run, oi_pnl_triage, vol_surface_daily. (~20 remaining)
 - [ ] Step 5 — finalize the list after the sweep
