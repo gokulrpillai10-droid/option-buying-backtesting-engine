@@ -6,13 +6,17 @@ REGIME STRATEGY (theta on calm, gamma on storm):
   BUY/long (storm) n= 25  net=    -271,957  win%=  16%  PF=0.39
   COMBINED         n= 48  net=    -122,295  win%=  38%  PF=0.83
 
-NULLS (same episodes, forced side):
+NULLS (same episodes, forced side) — regime must beat ALL five:
   always-long      n= 48  net=    -437,742  win%=  27%  PF=0.49
   always-short     n= 48  net=     402,744  win%=  73%  PF=1.92
   random           n= 48  net=     162,227  win%=  54%  PF=1.29
+  vix-pctile-only  n= 47  net=     284,735  win%=  62%  PF=1.58
+  block-shuffled   n= 48  net=     162,396  win%=  50%  PF=1.29
 
 SPLIT-HALF (combined regime strategy):
   2020-2022        n= 13  net=    -218,542  win%=  15%  PF=0.11
   2023-2026        n= 35  net=      96,247  win%=  46%  PF=1.21
 
-SAMPLE GUARD (>=3 episodes AND >=... per side): SELL n=23, BUY n=25
+SAMPLE GUARD (spec §104: >=30 P&L AND >=3 episodes per side):
+  SELL/short   INSUFFICIENT: 23 P&L < 30
+  BUY/long     INSUFFICIENT: 25 P&L < 30

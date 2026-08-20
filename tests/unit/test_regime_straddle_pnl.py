@@ -14,7 +14,7 @@ from engine.execution.costs import CostModel
 from engine.position.manager import Trade
 from analysis.regime_straddle_pnl import (
     straddle_trade, direction_for, summarize, atm_strike, straddle_from_snapshots,
-    _episode_entries,
+    _episode_entries, vix_percentile_side, block_shuffle, sample_guard,
 )
 
 
@@ -116,6 +116,45 @@ def test_episode_entries_are_lagged_to_next_session():
     # nothing fires on the label day itself
     assert (date(2020, 1, 2), "short") not in ents
     assert (date(2020, 1, 6), "long") not in ents
+
+
+def test_vix_percentile_only_null_sides_high_long_low_short():
+    # the VIX-percentile-only null proxies the vol-state call with raw VIX rank:
+    # high VIX percentile -> long (gamma), low -> short (theta), NaN -> stand aside.
+    assert vix_percentile_side(0.80) == "long"
+    assert vix_percentile_side(0.20) == "short"
+    assert vix_percentile_side(0.50) == "long"          # boundary is inclusive (>=)
+    assert vix_percentile_side(None) is None
+    assert vix_percentile_side(float("nan")) is None
+
+
+def test_block_shuffle_permutes_blocks_preserving_within_block_order():
+    import random
+    seq = list(range(10))
+    out = block_shuffle(seq, block_size=2, rng=random.Random(0))
+    assert sorted(out) == seq                           # same multiset
+    assert len(out) == len(seq)
+    # every original adjacent pair (0,1),(2,3),... stays contiguous and in order
+    for a in range(0, 10, 2):
+        i = out.index(a)
+        assert out[i + 1] == a + 1
+
+
+def test_block_shuffle_actually_reorders_with_this_seed():
+    import random
+    seq = list(range(10))
+    assert block_shuffle(seq, block_size=2, rng=random.Random(0)) != seq
+
+
+def test_sample_guard_needs_both_min_pnl_and_min_episodes():
+    ok, _ = sample_guard(n_pnl=23, n_episodes=23)        # 23 < 30 P&L
+    assert ok is False
+    ok, _ = sample_guard(n_pnl=35, n_episodes=2)         # too few distinct episodes
+    assert ok is False
+    ok, _ = sample_guard(n_pnl=35, n_episodes=5)         # both cleared
+    assert ok is True
+    ok, _ = sample_guard(n_pnl=30, n_episodes=3)         # inclusive boundary
+    assert ok is True
 
 
 def test_direction_for_maps_vol_state_to_side():

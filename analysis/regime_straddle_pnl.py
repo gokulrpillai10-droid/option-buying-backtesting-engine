@@ -89,6 +89,41 @@ def direction_for(stable_low_vol: bool, high_vol: bool):
     return None
 
 
+def vix_percentile_side(pct, threshold: float = 0.5):
+    """VIX-percentile-only null: pick the straddle side from raw VIX rank alone,
+    the naive one-signal proxy for the vol-state regime. High VIX percentile ->
+    ``'long'`` (proxy for stormy/gamma), low -> ``'short'`` (calm/theta), split at
+    ``threshold``. ``None`` when ``pct`` is missing/NaN (stand aside, don't force a
+    side during the percentile warm-up)."""
+    import math
+    if pct is None or (isinstance(pct, float) and math.isnan(pct)):
+        return None
+    return "long" if pct >= threshold else "short"
+
+
+def block_shuffle(seq, block_size: int, rng):
+    """Return ``seq`` reordered in contiguous blocks: split into blocks of
+    ``block_size``, shuffle the block ORDER (within-block order kept), flatten.
+    Preserves local structure and the multiset of values while destroying global
+    timing alignment -- a stricter null than i.i.d. shuffling for a calendar with
+    autocorrelated regimes."""
+    seq = list(seq)
+    blocks = [seq[i:i + block_size] for i in range(0, len(seq), block_size)]
+    rng.shuffle(blocks)
+    return [x for b in blocks for x in b]
+
+
+def sample_guard(n_pnl: int, n_episodes: int, min_pnl: int = 30, min_episodes: int = 3):
+    """Spec §104: a bucket may drive the verdict only with ``>= min_pnl`` P&L
+    observations AND ``>= min_episodes`` distinct episodes (power + independence).
+    Returns ``(ok, reason)``."""
+    if n_pnl < min_pnl:
+        return False, f"INSUFFICIENT: {n_pnl} P&L < {min_pnl}"
+    if n_episodes < min_episodes:
+        return False, f"INSUFFICIENT: {n_episodes} episodes < {min_episodes}"
+    return True, f"eligible ({n_pnl} P&L, {n_episodes} episodes)"
+
+
 def straddle_trade(strike: int, entry_call: float, entry_put: float,
                    exit_call: float, exit_put: float, qty: int,
                    direction: str, cost_model: CostModel, slip: float = 0.0) -> Trade:
@@ -189,20 +224,29 @@ def _collect_episode_snapshots(entries, md, cat):
 
 
 def _price_side(rows, side_fn, cost):
-    """Price every episode under a side policy ``side_fn(regime_dir, i)->'long'/'short'``."""
+    """Price every episode under a side policy ``side_fn(regime_dir, i)->'long'/'short'``.
+    A ``None`` side means stand aside (the VIX-percentile null during warm-up)."""
     trades = []
     for i, (d, rdir, en, ex, ref, qty) in enumerate(rows):
-        t = straddle_from_snapshots(en, ex, ref, qty, side_fn(rdir, i), cost, SLIP)
+        side = side_fn(rdir, i)
+        if side is None:
+            continue
+        t = straddle_from_snapshots(en, ex, ref, qty, side, cost, SLIP)
         if t is not None:
             trades.append((d, rdir, t))
     return trades
 
 
 def main():
+    import random
+
+    import pandas as pd
+
     from engine.data.catalog import Catalog
     from engine.data.market import MarketData
     from engine.data.spot import SpotSeries
     from analysis.regime_finder import label_regimes
+    from analysis.regime_data import load_vix
 
     cat = Catalog(ROOT)
     spot = SpotSeries.from_index(ROOT, "5min")
@@ -235,11 +279,22 @@ def main():
     line("BUY/long (storm)", buys)
     line("COMBINED", [t for _d, _rd, t in strat])
 
-    print("\nNULLS (same episodes, forced side):")
+    print("\nNULLS (same episodes, forced side) — regime must beat ALL five:")
     line("always-long", [t for _d, _rd, t in _price_side(rows, lambda rd, i: "long", cost)])
     line("always-short", [t for _d, _rd, t in _price_side(rows, lambda rd, i: "short", cost)])
     line("random", [t for _d, _rd, t in _price_side(
         rows, lambda rd, i: "long" if (i % 2 == 0) else "short", cost)])
+    # VIX-percentile-only: side from the expanding VIX percentile at entry (the
+    # naive one-signal proxy for the vol-state call; look-ahead safe, warm-up -> skip)
+    vixpct = load_vix().expanding(min_periods=252).rank(pct=True, method="max")
+    vix_pct_ep = [vixpct.get(pd.Timestamp(r[0])) for r in rows]
+    line("vix-pctile-only", [t for _d, _rd, t in _price_side(
+        rows, lambda rd, i: vix_percentile_side(vix_pct_ep[i]), cost)])
+    # block-shuffled regime calendar: keep the long/short mix + block structure,
+    # scramble the timing alignment (stricter than i.i.d. random)
+    shuffled = block_shuffle([r[1] for r in rows], block_size=4, rng=random.Random(12345))
+    line("block-shuffled", [t for _d, _rd, t in _price_side(
+        rows, lambda rd, i: shuffled[i], cost)])
 
     # split-half (episodes by entry year)
     print("\nSPLIT-HALF (combined regime strategy):")
@@ -248,9 +303,14 @@ def main():
     line("2020-2022", early)
     line("2023-2026", late)
 
-    # sample guard
-    print(f"\nSAMPLE GUARD (>=3 episodes AND >=... per side): "
-          f"SELL n={len(sells)}, BUY n={len(buys)}")
+    # sample guard (spec §104): a side is eligible to drive the verdict only with
+    # >=30 P&L observations AND >=3 distinct episodes.
+    sell_eps = {d for d, rd, _t in strat if rd == "short"}
+    buy_eps = {d for d, rd, _t in strat if rd == "long"}
+    print("\nSAMPLE GUARD (spec §104: >=30 P&L AND >=3 episodes per side):")
+    for name, trades, eps in (("SELL/short", sells, sell_eps), ("BUY/long", buys, buy_eps)):
+        _ok, reason = sample_guard(len(trades), len(eps))
+        print(f"  {name:<12} {reason}")
     return 0
 
 
