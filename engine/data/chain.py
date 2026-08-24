@@ -105,19 +105,3 @@ class Chain:
     def snapshot_at(self, dt: datetime) -> OptionChainSnapshot:
         frame = self._df[self._df["DateTime"] == pd.Timestamp(dt)]
         return OptionChainSnapshot(dt, frame)
-
-    def next_open(self, dt: datetime, strike: int, side: str) -> Optional[float]:
-        """Open price of ``strike``/``side`` at the first minute strictly after
-        ``dt``. Returns ``None`` if there is no following bar. This is the only
-        sanctioned fill price source — fills never occur at ``dt`` itself.
-        """
-        col = "CallOpen" if side.upper() == "CALL" else "PutOpen"
-        future = self._df[
-            (self._df["DateTime"] > pd.Timestamp(dt))
-            & (self._df["StrikePrice"] == strike)
-        ]
-        if future.empty:
-            return None
-        next_dt = future["DateTime"].min()
-        row = future[future["DateTime"] == next_dt].iloc[0]
-        return float(row[col])
