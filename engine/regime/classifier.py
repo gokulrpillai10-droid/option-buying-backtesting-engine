@@ -18,6 +18,10 @@ import pandas as pd
 
 from analysis.regime_finder import persistence
 
+# Verdict labels (named once; mirrors the Complacent/Normal/Stressed constants in
+# analysis.vol_surface_regime, and keeps the literals typo-proof across compare sites).
+BUY, SELL, NEUTRAL = "BUY", "SELL", "NEUTRAL"
+
 # Base weights (spec §67-74). breadth is deferred; when absent the others
 # renormalize over themselves, so its 0.07 is simply redistributed pro-rata.
 BASE_WEIGHTS = {
@@ -55,21 +59,21 @@ def composite(scores, weights=BASE_WEIGHTS, thr=0.15, min_agreement=0.6) -> Comp
     consensus). NEUTRAL unless ``|score| >= thr`` and ``confidence >= min_agreement``."""
     present = _present(scores)
     if not present:
-        return Composite(0.0, 0.0, "NEUTRAL")
+        return Composite(0.0, 0.0, NEUTRAL)
     tot = sum(weights[k] for k in present)
     w = {k: weights[k] / tot for k in present}
     score = sum(w[k] * present[k] for k in present)
 
     sign = np.sign(score)
     if sign == 0:
-        return Composite(0.0, 0.0, "NEUTRAL")
+        return Composite(0.0, 0.0, NEUTRAL)
     agree = sum(1 for k in present if np.sign(present[k]) == sign)
     confidence = agree / len(present)
 
     if abs(score) >= thr and confidence >= min_agreement:
-        label = "BUY" if sign > 0 else "SELL"
+        label = BUY if sign > 0 else SELL
     else:
-        label = "NEUTRAL"
+        label = NEUTRAL
     return Composite(float(score), float(confidence), label)
 
 
@@ -77,9 +81,9 @@ def persist(verdicts: pd.Series, need: int = 4, win: int = 5) -> pd.Series:
     """4-of-5 flip-flop guard on a BUY/SELL/NEUTRAL series: a BUY (SELL) stands only
     where BUY (SELL) occurred on ``>=need`` of the last ``win`` days; otherwise the
     day collapses to NEUTRAL. Reuses `regime_finder.persistence` on each side's mask."""
-    buy = persistence(verdicts == "BUY", need, win)
-    sell = persistence(verdicts == "SELL", need, win)
-    out = pd.Series("NEUTRAL", index=verdicts.index)
-    out[sell] = "SELL"
-    out[buy] = "BUY"
+    buy = persistence(verdicts == BUY, need, win)
+    sell = persistence(verdicts == SELL, need, win)
+    out = pd.Series(NEUTRAL, index=verdicts.index)
+    out[sell] = SELL
+    out[buy] = BUY
     return out

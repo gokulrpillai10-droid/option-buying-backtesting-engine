@@ -21,6 +21,7 @@ import pandas as pd
 from engine.regime.classifier import BASE_WEIGHTS
 
 HORIZON = 21          # trading days until a logged day is resolvable
+NEUTRAL_HIT = 0.5     # hit-rate that neither rewards nor penalises a module (coin-flip)
 
 
 def resolvable(journal: pd.DataFrame, now, horizon: int = HORIZON) -> pd.DataFrame:
@@ -87,14 +88,15 @@ def _clamp_normalize(weights, lo, hi):
 def adapt_weights(base, hit_rates, n_resolved, min_samples=40,
                   lo=0.05, hi=0.5, shrink=0.5) -> dict:
     """Nudge base weights toward better-hitting modules, subject to the gate,
-    shrinkage, and clamps. ``target ∝ base * (hit/0.5)`` (hit 0.5 = no change),
-    ``blended = shrink*base + (1-shrink)*target``, then projected into [lo, hi]."""
+    shrinkage, and clamps. ``target ∝ base * (hit/NEUTRAL_HIT)`` (a coin-flip hit
+    rate = no change), ``blended = shrink*base + (1-shrink)*target``, then projected
+    into [lo, hi]."""
     if n_resolved < min_samples:
         return dict(base)
     raw = {}
     for k in base:
         h = hit_rates.get(k)
-        factor = 1.0 if h is None else h / 0.5
+        factor = 1.0 if h is None else h / NEUTRAL_HIT
         raw[k] = base[k] * factor
     tot = sum(raw.values())
     if tot <= 0:

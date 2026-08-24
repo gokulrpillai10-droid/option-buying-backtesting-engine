@@ -19,10 +19,11 @@ import numpy as np
 import pandas as pd
 
 from analysis.regime_accuracy import welch_t, forward_realized_vol
+from analysis.regime_data import load_closes, load_vix
+from analysis.regime_vol import expanding_percentile
 
 FACTORS_CSV = "analysis/vol_surface_daily.csv"
 BREADTH_CSV = "analysis/nifty_breadth_daily.csv"
-from analysis.regime_data import load_closes, load_vix
 OUT_CSV = "analysis/vol_surface_regime.csv"
 COMPOSITE = ["skew", "atm_iv", "term", "accel", "breadth"]   # vrp dropped (noise)
 INVERT = {"breadth": True}       # LOW breadth (few stocks healthy) = stress
@@ -34,35 +35,34 @@ COMPLACENT, NORMAL, STRESSED = "Complacent", "Normal", "Stressed"
 # ------------------------------------------------------------------ #
 # pure scoring (tested)
 # ------------------------------------------------------------------ #
+def _tercile(frac: float):
+    """Map a fraction in [0, 1] to a 0/1/2 tercile score (bottom third -> 0,
+    middle -> 1, top -> 2); NaN passes through. The single tercile cut this
+    detector uses -- shared by the per-factor score and the composite bucket."""
+    if pd.isna(frac):
+        return np.nan
+    if frac >= 2 / 3:
+        return 2
+    if frac <= 1 / 3:
+        return 0
+    return 1
+
+
 def stress_score(series: pd.Series, min_periods: int = WARMUP,
                  invert: bool = False) -> pd.Series:
     """0/1/2 stress score by trailing percentile: top tercile -> 2 (stress),
     bottom -> 0, middle -> 1. ``invert=True`` flips it (LOW value = stress).
     Look-ahead safe (expanding percentile); NaN during warm-up."""
-    from analysis.regime_vol import expanding_percentile
     pct = expanding_percentile(series.astype(float), min_periods=min_periods)
     if invert:
         pct = 1.0 - pct
-
-    def to_score(p):
-        if pd.isna(p):
-            return np.nan
-        if p >= 2 / 3:
-            return 2
-        if p <= 1 / 3:
-            return 0
-        return 1
-    return pct.apply(to_score)
+    return pct.apply(_tercile)
 
 
 def bucket(total: float, n_factors: int) -> str:
-    """Summed 0..2*n stress score -> Complacent / Normal / Stressed (tercile cuts)."""
-    hi, lo = (2 * n_factors) * 2 / 3, (2 * n_factors) / 3
-    if total >= hi:
-        return STRESSED
-    if total <= lo:
-        return COMPLACENT
-    return NORMAL
+    """Summed 0..2*n stress score -> Complacent / Normal / Stressed (same tercile
+    cut as the per-factor score, applied to the normalized total)."""
+    return {2: STRESSED, 1: NORMAL, 0: COMPLACENT}[_tercile(total / (2 * n_factors))]
 
 
 # ------------------------------------------------------------------ #
@@ -115,7 +115,6 @@ def main():
           f"{' ** real separation' if abs(t) >= 3 else ' (weak)'}")
 
     # --- incremental to VIX: does it separate WITHIN the middle-VIX days? ---
-    from analysis.regime_vol import expanding_percentile
     vix = load_vix()
     vix.index = vix.index.date
     vpct = expanding_percentile(vix.reindex(pd.to_datetime(out.index).date).astype(float), WARMUP)

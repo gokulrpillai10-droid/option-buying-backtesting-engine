@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 
 from engine.regime.features import (
-    vol_state, iv_rv_ratio, vix_percentile, vol_dynamics, skew,
+    vol_state, iv_rv_ratio, vix_percentile, vol_dynamics, atm_skew,
 )
 
 
@@ -97,9 +97,9 @@ class _Snap:
 
 def test_skew_put_richer_than_call_scores_buy_fear():
     snap = _Snap(call_iv=0.10, put_iv=0.11)              # puts 10% richer / scale 0.1 -> +1
-    assert skew(snap, ref_price=20000, scale=0.1) == pytest.approx(1.0)
+    assert atm_skew(snap, ref_price=20000, scale=0.1) == pytest.approx(1.0)
 
 
 def test_skew_missing_greek_returns_none():
-    assert skew(_Snap(call_iv=None, put_iv=0.11), ref_price=20000) is None
-    assert skew(_Snap(call_iv=0.10, put_iv=None), ref_price=20000) is None
+    assert atm_skew(_Snap(call_iv=None, put_iv=0.11), ref_price=20000) is None
+    assert atm_skew(_Snap(call_iv=0.10, put_iv=None), ref_price=20000) is None

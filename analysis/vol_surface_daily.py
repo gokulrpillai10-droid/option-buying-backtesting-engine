@@ -23,11 +23,11 @@ import numpy as np
 import pandas as pd
 
 from analysis.chain_daily import front_weekly_eod_snapshot
-from analysis.vol_surface_features import atm_iv, skew, annualized_realized_vol
+from analysis.vol_surface_features import atm_iv, rr_skew, annualized_realized_vol
 from analysis.regime_accuracy import welch_t, forward_realized_vol
+from analysis.regime_data import load_closes, load_vix
 
 ROOT = "/Users/gokul/Desktop/tradealgo/data nifty "
-from analysis.regime_data import load_closes, load_vix
 QUARANTINE_FILE = "analysis/quarantine_days.json"
 OUT_CSV = "analysis/vol_surface_daily.csv"
 START = date(2020, 2, 1)
@@ -72,7 +72,7 @@ def build():
         aiv = atm_iv(snap, fwd)
         if not _sane_iv(aiv):
             continue
-        sk = skew(snap)
+        sk = rr_skew(snap)
         rows.append({"date": D, "atm_iv": aiv,
                      "skew": sk if _sane_iv(abs(sk) + 0.5) else np.nan})
     df = pd.DataFrame(rows).set_index("date")

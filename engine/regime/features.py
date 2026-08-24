@@ -10,7 +10,7 @@ Modules (spec §67-74):
   iv_rv_ratio    VRP      India VIX vs 21d realized vol (tenor-matched)
   vix_percentile IV level expanding min-1y VIX percentile
   vol_dynamics   dynamics VIX expanding vs contracting
-  skew           context  ATM put-vs-call IV skew from a chain snapshot
+  atm_skew       context  ATM put-vs-call IV skew from a chain snapshot
 """
 import numpy as np
 import pandas as pd
@@ -57,10 +57,13 @@ def vol_dynamics(vix: pd.Series, lookback: int = 10, scale: float = 0.2) -> pd.S
     return (rel / scale).clip(-1.0, 1.0)
 
 
-def skew(snapshot, ref_price: float, scale: float = 0.1):
+def atm_skew(snapshot, ref_price: float, scale: float = 0.1):
     """ATM put-vs-call IV skew from a chain snapshot. Fear skew (puts richer than
     calls) leans BUY/gamma (+); returns a score in ``[-1, +1]`` or ``None`` when a
-    greek is missing (passed through so the composite renormalizes without it)."""
+    greek is missing (passed through so the composite renormalizes without it).
+
+    (Distinct from ``analysis.vol_surface_features.rr_skew``, the 25-delta wing
+    risk-reversal; this one is the ATM strike put-vs-call skew.)"""
     strike = int(round(ref_price / 50.0) * 50)
     try:
         call_iv = snapshot.call(strike).iv

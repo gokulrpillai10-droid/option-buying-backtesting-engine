@@ -44,9 +44,12 @@ def strike_nearest_delta(snapshot, target: float, side: str) -> Optional[int]:
     return min(cand, key=lambda kd: abs(kd[1] - target))[0]
 
 
-def skew(snapshot, delta: float = 0.25) -> float:
+def rr_skew(snapshot, delta: float = 0.25) -> float:
     """Risk-reversal skew = IV(``delta`` put wing) - IV(``delta`` call wing).
-    Positive = puts bid over calls = downside fear / hedging demand."""
+    Positive = puts bid over calls = downside fear / hedging demand.
+
+    (Distinct from ``engine.regime.features.atm_skew``, the ATM put-vs-call skew;
+    this is the 25-delta wing risk-reversal.)"""
     pk = strike_nearest_delta(snapshot, -delta, "put")
     ck = strike_nearest_delta(snapshot, delta, "call")
     if pk is None or ck is None:

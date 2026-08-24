@@ -12,7 +12,10 @@ Spec: docs/superpowers/specs/2026-08-13-regime-buysell-detector-design.md
 """
 from __future__ import annotations
 
+import math
 import sys
+
+import pandas as pd
 
 from engine.execution.costs import CostModel
 from engine.position.manager import SpreadLeg, SpreadPosition, Trade
@@ -96,7 +99,6 @@ def vix_percentile_side(pct, threshold: float = 0.5):
     ``'long'`` (proxy for stormy/gamma), low -> ``'short'`` (calm/theta), split at
     ``threshold``. ``None`` when ``pct`` is missing/NaN (stand aside, don't force a
     side during the percentile warm-up)."""
-    import math
     if pct is None or (isinstance(pct, float) and math.isnan(pct)):
         return None
     return "long" if pct >= threshold else "short"
@@ -190,7 +192,6 @@ def _collect_episode_snapshots(entries, md, cat):
     """For each episode, resolve its held contract and return
     (entry_date, regime_dir, entry_snap, exit_snap, ref_spot, qty). Skips (logs)
     episodes with no contract/day/data."""
-    import pandas as pd
     from engine.instruments import lot_size_for
 
     closes = load_closes()
@@ -239,8 +240,6 @@ def _price_side(rows, side_fn, cost):
 
 def main():
     import random
-
-    import pandas as pd
 
     from engine.data.catalog import Catalog
     from engine.data.market import MarketData

@@ -4,7 +4,7 @@ ATM IV, delta-strike selection, put/call skew (risk reversal), and VRP. Snapshot
 import math
 
 from analysis.vol_surface_features import (
-    atm_iv, strike_nearest_delta, skew, vrp,
+    atm_iv, strike_nearest_delta, rr_skew, vrp,
 )
 
 
@@ -50,7 +50,7 @@ def test_strike_nearest_delta_picks_the_right_wing():
 
 def test_skew_is_put_wing_minus_call_wing_iv():
     # 25d put strike 19900 (iv .17) minus 25d call strike 20100 (iv .155)
-    assert round(skew(_SNAP), 4) == round(0.17 - 0.155, 4)       # positive = put skew (fear)
+    assert round(rr_skew(_SNAP), 4) == round(0.17 - 0.155, 4)    # positive = put skew (fear)
 
 
 def test_vrp_is_iv_over_realized_and_nan_safe():

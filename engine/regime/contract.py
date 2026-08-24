@@ -15,7 +15,7 @@ import pandas as pd
 from analysis.regime_finder import label_regimes
 from analysis.regime_data import load_closes_vix
 from engine.regime.features import (
-    vol_state, iv_rv_ratio, vix_percentile, vol_dynamics, skew,
+    vol_state, iv_rv_ratio, vix_percentile, vol_dynamics, atm_skew,
 )
 from engine.regime.breadth import breadth_score
 from engine.regime.classifier import composite, BASE_WEIGHTS
@@ -73,7 +73,7 @@ def classify(as_of, closes=None, vix=None, snapshot=None, ref_price=None,
         "vol_dynamics": _last(vol_dynamics(vix)),
         "iv_rv": _last(iv_rv_ratio(vix, closes)),
         "vix_level": _last(vix_percentile(vix)),
-        "skew": skew(snapshot, ref_price) if use_skew else None,
+        "skew": atm_skew(snapshot, ref_price) if use_skew else None,
         "breadth": breadth_score(),
     }
     comp = composite(modules, weights=weights, thr=thr, min_agreement=min_agreement)
