@@ -1,23 +1,23 @@
 Loading spot + catalog ...
 Running CPR 9-lot, book6/trail3/+50/far/IV<=0.12, vol>=10x floor ...
 
-=== CPR 9-LOT on Rs500,000 capital  (194 trade-days / 6.1y) ===
-net total            Rs   1,305,287
-annualized           Rs     212,363   (42.5% of Rs5L/yr)
-max drawdown         Rs    -169,953   (34.0% of Rs5L)
+=== CPR 9-LOT on Rs500,000 capital  (212 trade-days / 6.1y) ===
+net total            Rs   1,050,044
+annualized           Rs     170,837   (34.2% of Rs5L/yr)
+max drawdown         Rs    -111,944   (22.4% of Rs5L)
 longest WIN streak     7 trade-days
-longest LOSS streak    8 trade-days
-median capital/trade Rs     128,723   p90 Rs178,821   (max single Rs238,194)
+longest LOSS streak    6 trade-days
+median capital/trade Rs     102,547   p90 Rs162,428   (max single Rs238,194)
 worst single day     Rs     -48,111   best day Rs43,811
 
 year   days        net Rs    %5L     maxDD Rs  win%  Wstk  Lstk
 ---------------------------------------------------------------
 2020      4        54,163    11%            0  100%     4     0
-2021      6        18,727     4%      -25,923   50%     2     2
-2022      7       149,779    30%      -27,835   86%     6     1
-2023     70       244,790    49%     -169,953   44%     5     8
-2024     18       172,836    35%      -46,301   61%     3     3
-2025     68       532,103   106%      -92,893   56%     5     4
+2021      8        18,789     4%      -29,070   50%     2     2
+2022      7        99,664    20%      -18,572   86%     6     1
+2023     77       144,597    29%      -96,032   43%     5     6
+2024     27        65,588    13%      -48,383   52%     5     5
+2025     68       534,355   107%      -92,893   56%     5     4
 2026     21       132,888    27%     -111,944   52%     6     6
 
-drop-2025 net Rs773,183
+drop-2025 net Rs515,689

@@ -7,24 +7,24 @@ Running deployed CPR config (book4/trail2/+50/far/IV<=0.12, slip 0.25%) ...
 period 2020-01-01..2026-02-25  (6.2y)   trade-days 280   ~46/yr
 
  RETURNS
-   net total            Rs     744,824
-   annualized           Rs     121,071
-   mean / trade-day     Rs       2,660   (std Rs16,561)
-   avg weekly (active)  Rs       6,259   (119 active wks)
-   mean daily return            3.29%  (on capital deployed)
-   median daily return         -2.35%
+   net total            Rs     642,689
+   annualized           Rs     104,469
+   mean / trade-day     Rs       2,295   (std Rs13,440)
+   avg weekly (active)  Rs       5,401   (119 active wks)
+   mean daily return            3.26%  (on capital deployed)
+   median daily return         -2.36%
 
  RISK-ADJUSTED   (Sharpe/Sortino on TRADE-DAY series, ann by sqrt(46 td/yr);
                     NOT a calendar-daily Sharpe -- flat days excluded)
-   Sharpe (trade-day,ann)       1.08
-   Sortino (trade-day)          2.77
-   Calmar                       0.98
+   Sharpe (trade-day,ann)       1.15
+   Sortino (trade-day)          2.57
+   Calmar                       1.27
 
  DRAWDOWN / TAILS
-   max drawdown         Rs    -122,916   (96% of 1-pos capital)
-   longest underwater    37 trade-days   longest losing streak 7
-   VaR  95% (day)       Rs     -21,200   (-16.5% of capital)
-   CVaR 95% (day)       Rs     -24,757   (-19.3%)  [expected shortfall]
+   max drawdown         Rs     -82,274   (72% of 1-pos capital)
+   longest underwater    35 trade-days   longest losing streak 7
+   VaR  95% (day)       Rs     -16,874   (-14.7% of capital)
+   CVaR 95% (day)       Rs     -22,643   (-19.7%)  [expected shortfall]
    VaR  99% (day)       Rs     -26,491      CVaR 99% Rs-29,671
    best day Rs29,176   worst day Rs-32,090
 
@@ -35,78 +35,78 @@ period 2020-01-01..2026-02-25  (6.2y)   trade-days 280   ~46/yr
    positive months               53%  (38 active months)
 
  CAPITAL
-   median outlay/trade  Rs      94,499
-   p90 outlay (1-pos)   Rs     128,570
-   ring-fence (cap+DD)  Rs     251,487   ->  ROC 48%/yr
+   median outlay/trade  Rs      69,860
+   p90 outlay (1-pos)   Rs     114,856
+   ring-fence (cap+DD)  Rs     197,131   ->  ROC 53%/yr
 
  COSTS (brokerage+STT+exchange+SEBI+stamp+GST; excl. the 0.25% slip)
-   total costs          Rs      69,441
-   avg / trade-day      Rs         248
-   avg / leg            Rs         181   (384 legs)
-   costs vs gross P&L             9%  (gross Rs814,265 -> net Rs744,824)
+   total costs          Rs      57,476
+   avg / trade-day      Rs         205
+   avg / leg            Rs         150   (384 legs)
+   costs vs gross P&L             8%  (gross Rs700,165 -> net Rs642,689)
 
  YEAR-BY-YEAR
    yr     days       net Rs  win%    maxDD Rs
    2020     12      -27,053   50%     -35,719
-   2021     19        3,683   37%     -44,343
-   2022      7       99,664   86%     -18,572
-   2023    105      123,830   41%    -122,916
-   2024     37       59,088   46%    -112,437
-   2025     78      381,197   53%     -67,432
+   2021     19        2,046   37%     -29,625
+   2022      7       66,254   86%     -12,397
+   2023    105       80,429   41%     -82,274
+   2024     37       33,900   46%     -51,548
+   2025     78      382,698   53%     -67,432
    2026     22      104,415   55%     -74,724
-   drop-2025 net Rs363,626
+   drop-2025 net Rs259,991
 
 ================================================================
  REALISTIC LIVE FILL (volume >= 10x order floor)
 ================================================================
-period 2020-01-03..2026-02-25  (6.1y)   trade-days 207   ~34/yr
+period 2020-01-03..2026-02-25  (6.1y)   trade-days 221   ~36/yr
 
  RETURNS
-   net total            Rs     868,525
-   annualized           Rs     141,305
-   mean / trade-day     Rs       4,196   (std Rs17,124)
-   avg weekly (active)  Rs       8,194   (106 active wks)
-   mean daily return            5.16%  (on capital deployed)
-   median daily return          5.18%
+   net total            Rs     634,666
+   annualized           Rs     103,257
+   mean / trade-day     Rs       2,872   (std Rs13,920)
+   avg weekly (active)  Rs       5,770   (110 active wks)
+   mean daily return            4.29%  (on capital deployed)
+   median daily return         -0.00%
 
- RISK-ADJUSTED   (Sharpe/Sortino on TRADE-DAY series, ann by sqrt(34 td/yr);
+ RISK-ADJUSTED   (Sharpe/Sortino on TRADE-DAY series, ann by sqrt(36 td/yr);
                     NOT a calendar-daily Sharpe -- flat days excluded)
-   Sharpe (trade-day,ann)       1.42
-   Sortino (trade-day)          3.61
-   Calmar                       1.47
+   Sharpe (trade-day,ann)       1.24
+   Sortino (trade-day)          2.80
+   Calmar                       1.38
 
  DRAWDOWN / TAILS
-   max drawdown         Rs     -96,032   (78% of 1-pos capital)
-   longest underwater    29 trade-days   longest losing streak 6
-   VaR  95% (day)       Rs     -21,737   (-17.7% of capital)
-   CVaR 95% (day)       Rs     -24,930   (-20.3%)  [expected shortfall]
-   VaR  99% (day)       Rs     -25,959      CVaR 99% Rs-28,845
+   max drawdown         Rs     -74,724   (69% of 1-pos capital)
+   longest underwater    32 trade-days   longest losing streak 7
+   VaR  95% (day)       Rs     -17,094   (-15.8% of capital)
+   CVaR 95% (day)       Rs     -22,387   (-20.6%)  [expected shortfall]
+   VaR  99% (day)       Rs     -25,333      CVaR 99% Rs-28,845
    best day Rs29,176   worst day Rs-32,090
 
  WIN RATIOS
-   trade-day win                 52%
-   leg win                       67%  (scale-out legs)
-   positive weeks                66%
-   positive months               77%  (35 active months)
+   trade-day win                 50%
+   leg win                       64%  (scale-out legs)
+   positive weeks                62%
+   positive months               70%  (37 active months)
 
  CAPITAL
-   median outlay/trade  Rs      88,601
-   p90 outlay (1-pos)   Rs     122,986
-   ring-fence (cap+DD)  Rs     219,018   ->  ROC 65%/yr
+   median outlay/trade  Rs      68,831
+   p90 outlay (1-pos)   Rs     108,515
+   ring-fence (cap+DD)  Rs     183,239   ->  ROC 56%/yr
 
  COSTS (brokerage+STT+exchange+SEBI+stamp+GST; excl. the 0.25% slip)
-   total costs          Rs      50,351
-   avg / trade-day      Rs         243
-   avg / leg            Rs         170   (296 legs)
-   costs vs gross P&L             5%  (gross Rs918,875 -> net Rs868,525)
+   total costs          Rs      45,119
+   avg / trade-day      Rs         204
+   avg / leg            Rs         145   (311 legs)
+   costs vs gross P&L             7%  (gross Rs679,785 -> net Rs634,666)
 
  YEAR-BY-YEAR
    yr     days       net Rs  win%    maxDD Rs
    2020      4       36,030  100%           0
-   2021      8       18,789   50%     -29,070
-   2022      7       99,664   86%     -18,572
-   2023     77      144,597   43%     -96,032
-   2024     21      133,603   62%     -55,034
-   2025     69      347,753   54%     -67,432
+   2021     10       -3,634   40%     -19,411
+   2022      7       66,254   86%     -12,397
+   2023     83       55,546   41%     -73,706
+   2024     27       43,127   52%     -32,334
+   2025     69      349,254   54%     -67,432
    2026     21       88,089   52%     -74,724
-   drop-2025 net Rs520,771
+   drop-2025 net Rs285,412

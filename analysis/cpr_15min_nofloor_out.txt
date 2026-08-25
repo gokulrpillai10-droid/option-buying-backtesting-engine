@@ -1,5 +1,5 @@
 --- CPR deployable config, volume floor OFF, 5min vs 15min ---
-5min   NOFLOOR  legs  384  days  280  net Rs   744,824  PF 1.43  t  9.17  maxDD Rs -122,916  redYrs 1
-        yearly: 2020: -27,053  2021:  +3,683  2022: +99,664  2023:+123,830  2024: +59,088  2025:+381,197  2026:+104,415
-15min  NOFLOOR  legs  402  days  286  net Rs   675,322  PF 1.32  t  8.93  maxDD Rs -124,308  redYrs 2
-        yearly: 2020: -46,703  2021: -62,865  2022: +99,086  2023:+127,232  2024: +55,207  2025:+375,575  2026:+127,789
+5min   NOFLOOR  legs  384  days  280  net Rs   642,689  PF 1.49  t  9.14  maxDD Rs  -82,274  redYrs 1
+        yearly: 2020: -27,053  2021:  +2,046  2022: +66,254  2023: +80,429  2024: +33,900  2025:+382,698  2026:+104,415
+15min  NOFLOOR  legs  402  days  286  net Rs   587,494  PF 1.37  t  8.90  maxDD Rs -123,310  redYrs 2
+        yearly: 2020: -46,703  2021: -42,303  2022: +65,869  2023: +82,587  2024: +23,682  2025:+376,574  2026:+127,789

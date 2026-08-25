@@ -1,11 +1,11 @@
 --- CPR 3-MINUTE timeframe vs validated 5-min ---
 
 === timeframe=3min  floor=10 ===
-  legs  279  trade-days  205  net Rs   334,879  PF 1.25  win 59%  t 6.88  maxDD Rs -195,424  tail(excl5) Rs   259,822  redYrs 2
-  yearly: 2020: +33,549  2021: -20,293  2022: +41,821  2023: -18,257  2024: +64,807  2025:+195,370  2026: +37,881
-  exits : {'cpr_stop': 108, 'book': 74, 'ptrail': 73, 'eod': 24}
+  legs  291  trade-days  216  net Rs   259,796  PF 1.23  win 58%  t 6.61  maxDD Rs -141,290  tail(excl5) Rs   184,753  redYrs 2
+  yearly: 2020: +33,549  2021: -25,066  2022: +27,723  2023: -23,381  2024: +12,275  2025:+196,814  2026: +37,881
+  exits : {'cpr_stop': 116, 'book': 75, 'ptrail': 74, 'eod': 26}
 
 === timeframe=3min  floor=0 ===
-  legs  366  trade-days  280  net Rs   133,264  PF 1.07  win 55%  t 6.29  maxDD Rs -176,944  tail(excl5) Rs    47,929  redYrs 4
-  yearly: 2020: -24,376  2021: -90,471  2022: +41,821  2023: +35,919  2024: -23,069  2025:+209,853  2026: -16,413
+  legs  366  trade-days  280  net Rs   154,750  PF 1.10  win 55%  t 6.26  maxDD Rs -114,162  tail(excl5) Rs    79,105  redYrs 4
+  yearly: 2020: -24,376  2021: -60,660  2022: +27,723  2023: +21,885  2024:  -4,705  2025:+211,297  2026: -16,413
   exits : {'cpr_stop': 153, 'book': 86, 'ptrail': 85, 'eod': 42}
