@@ -53,7 +53,7 @@ class BuyCallSpread(Strategy):
     def manage(self, ctx, pos):
         snap = ctx.snapshot()
         prices = [snap.call(lg.strike).close for lg in pos.legs]
-        return Exit.market("target") if pos.unrealized(prices) >= 2000 else None
+        return Exit.market("target") if pos.unrealized(prices) >= 1000 else None
 
 
 def test_spread_enter_manage_close_one_combined_trade():
@@ -62,8 +62,8 @@ def test_spread_enter_manage_close_one_combined_trade():
                    CostModel()).run(BuyCallSpread(), d, d)
     assert len(res.trades) == 1
     t = res.trades[0]
-    q = lot_size_for(d)                                  # 75
+    q = lot_size_for(d)                                  # 50 (2024 lot)
     assert t.side == "SPREAD" and t.reason == "target" and t.qty == q
     # exit at 09:30: long 150->260 (+110), short 50->130 (-80) => +30/unit
-    assert t.gross == pytest.approx((110 - 80) * q)      # 2250
+    assert t.gross == pytest.approx((110 - 80) * q)      # 1500
     assert t.net == pytest.approx(t.gross - t.cost) and t.cost > 0

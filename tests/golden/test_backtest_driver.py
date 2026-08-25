@@ -83,6 +83,22 @@ def test_two_day_enter_hold_eod_with_costs_and_lotsize():
     assert t2.gross == pytest.approx((230 - 200) * qty)
 
 
+class LotMarket(FakeMarket):
+    """FakeMarket that also exposes a per-expiry lot (the real MarketData contract),
+    so the driver sizes by the EXPIRY it trades, not the calendar day."""
+    def lot_size(self, expiry):
+        return 25 if expiry == date(2024, 6, 6) else 999
+
+
+def test_driver_sizes_by_traded_expiry_lot():
+    d1 = date(2024, 6, 3)                                  # day sits in the 50-lot day-schedule
+    spot = _spot_5min([d1])
+    batches = [(date(2024, 6, 6), {d1: _day_chain(d1, 100, 120)})]
+    res = Backtest(LotMarket(spot, batches), CostModel()).run(BuyFirstBarHold(), d1, d1)
+    assert len(res.trades) == 1
+    assert res.trades[0].qty == 25                         # per-expiry lot, not lot_size_for(day)
+
+
 class BuyThenScaleOut(Strategy):
     def on_day_start(self, ctx):
         self._in = False
@@ -183,9 +199,9 @@ def test_range_scaled_slippage_charges_fast_bars_more():
 
 
 def test_thin_exit_penalty_multiplies_slip_when_volume_cant_absorb_qty():
-    # exit-bar volume 50 < min_volume_mult(1.0) * qty(75, the full lot) -> slip
+    # exit-bar volume 40 < min_volume_mult(1.0) * qty(50, the 2024 lot) -> slip
     # doubles; a liquid exit bar keeps the base slip
-    d1, spot, chain = _slip_tape(exit_vol=50)
+    d1, spot, chain = _slip_tape(exit_vol=40)
     knobs = Knobs(slippage_pct=0.01, min_volume_mult=1.0, thin_exit_mult=2.0)
     res = Backtest(FakeMarket(spot, [(date(2024, 1, 11), {d1: chain})]), CostModel(),
                    knobs).run(BuyThenMarketExit(), d1, d1)

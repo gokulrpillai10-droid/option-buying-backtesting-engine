@@ -104,13 +104,23 @@ class Backtest:
 
     def run(self, strategy, start: date, end: date) -> Result:
         result = Result()
-        for _expiry, chains in self._market.stream(start, end):
+        for expiry, chains in self._market.stream(start, end):
             for day in sorted(chains):
-                result.trades.extend(self._run_day(strategy, day, chains[day]))
+                result.trades.extend(self._run_day(strategy, expiry, day, chains[day]))
         return result
 
+    def _lot(self, expiry, day) -> int:
+        """Contract lot for sizing: the traded EXPIRY's authoritative lot when the
+        market exposes one (``market.lot_size``), else the day-keyed schedule."""
+        fn = getattr(self._market, "lot_size", None)
+        if fn is not None:
+            v = fn(expiry)
+            if v is not None:
+                return v
+        return lot_size_for(day)
+
     # ---- one day ----
-    def _run_day(self, strategy, day: date, chain: Chain) -> List[Trade]:
+    def _run_day(self, strategy, expiry, day: date, chain: Chain) -> List[Trade]:
         spot = self._market.spot()
         bars = [t for t in spot.timestamps() if t.to_pydatetime().date() == day]
         if not bars:
@@ -130,14 +140,14 @@ class Backtest:
                 if orders:
                     fill_dt = b + self._tf
                     if len(orders) > 1 or any(o.action == "sell" for o in orders):
-                        pos = self._open_spread(orders, chain, fill_dt, day, slip)  # multi-leg
+                        pos = self._open_spread(orders, chain, fill_dt, expiry, day, slip)  # multi-leg
                         if pos is not None:
                             entry_dt = fill_dt.to_pydatetime()
                         continue
                     q = self._opt_quote(chain, fill_dt, orders[0].strike, orders[0].side)
                     if q is not None:
                         px = q.open if self._k.fill_price == "open" else q.close
-                        qty = orders[0].qty if orders[0].qty is not None else orders[0].lots * lot_size_for(day)
+                        qty = orders[0].qty if orders[0].qty is not None else orders[0].lots * self._lot(expiry, day)
                         if self._volume_ok(chain, now, orders[0].strike, orders[0].side, qty):
                             eslip = self._eff_slip(q.high, q.low)   # entry qty gated by _volume_ok
                             pos = Position(orders[0].side, orders[0].strike, px * (1 + eslip), qty)
@@ -264,7 +274,7 @@ class Backtest:
                                       exit_dt=pd.Timestamp(last).to_pydatetime()))
         return trades
 
-    def _open_spread(self, orders, chain, fill_dt, day, slip):
+    def _open_spread(self, orders, chain, fill_dt, expiry, day, slip):
         """Open a multi-leg SpreadPosition; each leg fills at fill_dt with adverse
         slip (buy UP, sell DOWN). Returns None if any leg can't be priced (all-or-none).
 
@@ -273,7 +283,7 @@ class Backtest:
         assignment) is not modeled — refuse loudly instead of pricing it wrong."""
         net = {"CALL": 0.0, "PUT": 0.0}
         for o in orders:
-            qty = o.qty if o.qty is not None else o.lots * lot_size_for(day)
+            qty = o.qty if o.qty is not None else o.lots * self._lot(expiry, day)
             net[o.side.upper()] += qty if o.action == "buy" else -qty
         if any(q < 0 for q in net.values()):
             raise ValueError("naked short option legs are not modeled "
@@ -284,7 +294,7 @@ class Backtest:
             px = self._opt_price(chain, fill_dt, o.strike, o.side, self._k.fill_price)
             if px is None:
                 return None
-            qty = o.qty if o.qty is not None else o.lots * lot_size_for(day)
+            qty = o.qty if o.qty is not None else o.lots * self._lot(expiry, day)
             entry = px * (1 + slip) if o.action == "buy" else px * (1 - slip)
             legs.append(SpreadLeg(action=o.action, side=o.side, strike=o.strike,
                                   entry=entry, qty=qty))

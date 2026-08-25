@@ -17,6 +17,7 @@ import pandas as pd
 
 from engine.data.chain import Chain
 from engine.data.spot import SpotSeries
+from engine.instruments import lot_size_for
 
 
 def load_quarantine(path: str) -> set:
@@ -55,6 +56,17 @@ class MarketData:
             if (e - day).days >= self._min_dte:
                 return e
         return None
+
+    def lot_size(self, expiry: date) -> int:
+        """Authoritative lot size for the contract expiring on ``expiry`` (per-expiry
+        EXPIRIES data). Falls back to the day-keyed front-weekly schedule if the
+        catalog carries no lot table or the expiry precedes it."""
+        lt = self._cat.lot_table() if hasattr(self._cat, "lot_table") else None
+        if lt is not None:
+            v = lt.for_expiry(expiry)
+            if v is not None:
+                return v
+        return lot_size_for(expiry)
 
     def spot(self) -> SpotSeries:
         return self._spot
