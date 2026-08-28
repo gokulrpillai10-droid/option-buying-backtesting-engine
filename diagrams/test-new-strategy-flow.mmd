@@ -1,0 +1,15 @@
+graph TD
+    A[Strategy handed over for backtest] --> B[Understand the strategy's CONDITIONS<br/>entry / exit rules, instrument,<br/>timeframe, sizing, filters]
+    B --> C{Can the engine express it?<br/>inside the envelope:<br/>intraday, long-premium / covered / equity?}
+    C -->|No| Y[Out of envelope<br/>note the missing engine capability<br/>needed before it can be tested]
+    C -->|Yes| D[Encode as a strategy class<br/>strategies/name.py<br/>conditions -> on_bar Order / manage Exit<br/>signals from ctx: look-ahead safe]
+    D --> E[TDD unit test<br/>tests/unit/test_name.py<br/>assert the conditions fire on a synthetic bar]
+    E --> F[Write runner on OUR data<br/>analysis/name_run.py<br/>Catalog + SpotSeries + MarketData + Backtest]
+    F --> G[BACKTEST on the real data we have<br/>PYTHONPATH=. python3 analysis/name_run.py<br/>engine applies lots, costs, look-ahead, integrity]
+    G --> H[Find the edge FROM THE DATA<br/>net / PF / Sharpe vs nulls,<br/>t-stat, split-half, per-year,<br/>tail-excl, costs in, pessimistic intrabar]
+    H --> I{Is there an edge in the data?}
+    I -->|No| J[Document NO-GO + why]
+    I -->|Yes| L[Candidate: stress test,<br/>walk-forward, live fill audit]
+    J --> K[Commit runner + _out.txt]
+    L --> K
+    K --> M([Done])

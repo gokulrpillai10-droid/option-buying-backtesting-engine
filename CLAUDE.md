@@ -8,6 +8,7 @@ Convention: analysis scripts live in `analysis/` and commit alongside their `_ou
 When the user's request matches an available skill, invoke it via the Skill tool. When in doubt, invoke the skill.
 
 Key routing rules:
+- Backtest / test / validate a GIVEN trading strategy on our data → invoke /backtest-strategy (the edge is found by the backtest on our data, NOT by brainstorming). See diagrams/test-new-strategy-flow.mmd.
 - Product ideas/brainstorming → invoke /office-hours
 - Strategy/scope → invoke /plan-ceo-review
 - Architecture → invoke /plan-eng-review
