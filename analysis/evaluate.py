@@ -59,6 +59,10 @@ class Verdict:
             f"years +{int(m['years_positive'])}/{int(m['years_total'])}  "
             f"net-excl-top{TAIL_N} Rs{m['tail_excl_net']:,.0f}",
         ]
+        by = m.get("by_year")
+        if by:
+            lines.append("  by year: " + "  ".join(
+                f"{y} Rs{v:,.0f} {'+' if v > 0 else '-'}" for y, v in by.items()))
         if m.get("cost_frac") is not None:
             lines.append(f"  costs {m['cost_frac']:.0%} of gross")
         if self.reasons:
@@ -167,6 +171,7 @@ def evaluate(result, name: str = "strategy", gross: Optional[float] = None,
         "bootstrap_p": _bootstrap_p(nets),
         "early_net": early_net, "late_net": late_net,
         "years_total": years_total, "years_positive": years_positive,
+        "by_year": dict(sorted(by_year.items())),
         "tail_excl_net": tail_excl_net,
         "cost_frac": ((gross - net) / gross) if (gross and gross > 0) else None,
     }
