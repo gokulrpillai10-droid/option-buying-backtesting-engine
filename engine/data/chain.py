@@ -52,6 +52,14 @@ class OptionChainSnapshot:
         """The timestamp this snapshot was taken at (its explicit as-of stamp)."""
         return self._dt
 
+    @property
+    def forward(self) -> Optional[float]:
+        """Chain-level forward price at this snapshot (same for all strikes at a minute)."""
+        if "Forward" not in self._frame.columns or self._frame.empty:
+            return None
+        v = self._frame["Forward"].iloc[0]
+        return None if pd.isna(v) else float(v)
+
     def strikes(self) -> List[int]:
         return sorted(int(s) for s in self._frame.index)
 

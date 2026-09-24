@@ -18,6 +18,7 @@ class CostModel:
     sebi: float = 0.000001              # SEBI turnover fee, both sides
     stamp_buy: float = 0.00003          # stamp duty, buy side only
     gst: float = 0.18                   # GST on (brokerage + exchange + sebi)
+    exercise_stt_rate: float = 0.0015  # ITM exercise: 0.15% of intrinsic value, not spot
 
     def total(self, buy_value: float, sell_value: float, n_orders: int) -> float:
         """Total round-trip cost for ``n_orders`` executions moving ``buy_value``
@@ -29,3 +30,9 @@ class CostModel:
         stamp = self.stamp_buy * buy_value
         gst = self.gst * (brokerage + exch + sebi)
         return brokerage + stt + exch + sebi + stamp + gst
+
+    def exercise_stt(self, intrinsic_value: float) -> float:
+        """STT on ITM long option exercised at expiry.
+        ``intrinsic_value`` = (spot - strike) × qty for calls, (strike - spot) × qty for puts.
+        This replaces the normal stt_sell for that leg."""
+        return self.exercise_stt_rate * intrinsic_value

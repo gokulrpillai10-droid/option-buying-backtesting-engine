@@ -42,3 +42,16 @@ def test_rates_are_configurable():
     # no brokerage, no GST -> only turnover-based statutory charges remain
     # stt 7.8 + exch 5.00929 + sebi 0.0143 + stamp 0.195
     assert cm.total(buy_value=6500.0, sell_value=7800.0, n_orders=2) == pytest.approx(13.01859)
+
+
+def test_exercise_stt_on_intrinsic_not_spot():
+    """ITM exercise STT = 0.15% of intrinsic value (settlement), NOT spot × qty.
+    Call strike 24000, spot 24200: intrinsic = 200 × 75 = 15000; STT = Rs 22.50."""
+    cm = CostModel()
+    intrinsic_value = 200 * 75   # (spot - strike) × qty
+    assert cm.exercise_stt(intrinsic_value) == pytest.approx(22.50)
+
+
+def test_exercise_stt_rate_is_configurable():
+    cm = CostModel(exercise_stt_rate=0.001)
+    assert cm.exercise_stt(15000) == pytest.approx(15.0)

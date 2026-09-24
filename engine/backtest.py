@@ -12,7 +12,7 @@ resolution and carry-forward are layered on in following increments.
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
-from datetime import date
+from datetime import date, datetime
 from typing import List, Optional
 
 import pandas as pd
@@ -43,12 +43,13 @@ class Knobs:
     ``spread_rs`` models the full bid-ask spread as a fixed ₹ amount per fill:
     added to the entry price (buy at ask) and subtracted from the exit price
     (sell at bid).  Use with ``intrabar='pessimistic'`` for a full friction scenario.
-    Conservative calibration estimates (pending live-fill audit):
-        ATM option  ~₹8     (deep liquid; less on quiet days)
-        1-OTM       ~₹5
-        2+ OTM      ~₹2
-    Applied to single-leg fills only; spread-position legs are unaffected until
-    live calibration confirms per-leg spread sizes.
+
+    ``spread_otm_tiers`` overrides ``spread_rs`` with a distance-based lookup when
+    set.  Each entry is ``(max_otm_pts, spread_rs)`` sorted ascending by threshold.
+    OTM distance = |strike - forward| at the fill bar.  Example:
+        spread_otm_tiers=((50, 8.0), (150, 5.0))
+        → within 50pt of ATM: Rs8; 50-150pt out: Rs5; beyond: falls back to spread_rs
+    Applied to single-leg fills only; spread-position legs are unaffected.
     """
     slippage_pct: float = 0.0
     timeframe: str = "5min"
@@ -58,7 +59,8 @@ class Knobs:
     # state-dependent friction (0/1 = off = flat slippage_pct, the historical behavior):
     slippage_range_k: float = 0.0  # extra slip = k * (fill-bar high-low)/mid — fast markets pay more
     thin_exit_mult: float = 1.0    # multiply slip when EXIT-bar volume < min_volume_mult * qty
-    spread_rs: float = 0.0         # fixed ₹ spread per fill (buy pays +, sell receives -)
+    spread_rs: float = 0.0         # fixed ₹ spread per fill; fallback when spread_otm_tiers is empty
+    spread_otm_tiers: tuple = ()   # ((max_otm_pts, spread_rs), ...) OTM-distance tiers, ascending
 
 
 @dataclass
@@ -172,8 +174,9 @@ class Backtest:
                         qty = orders[0].qty if orders[0].qty is not None else orders[0].lots * self._lot(expiry, day)
                         if self._volume_ok(chain, now, orders[0].strike, orders[0].side, qty):
                             eslip = self._eff_slip(q.high, q.low)   # entry qty gated by _volume_ok
+                            entry_spread = self._spread_for(chain, fill_dt, orders[0].strike)
                             pos = Position(orders[0].side, orders[0].strike,
-                                           px * (1 + eslip) + self._k.spread_rs, qty)
+                                           px * (1 + eslip) + entry_spread, qty)
                             entry_dt = fill_dt.to_pydatetime()
                             peak = px                          # premium peak starts at the raw fill
                             strategy.on_fill(orders[0])
@@ -210,14 +213,16 @@ class Backtest:
                     if q is not None:
                         px = q.open if self._k.fill_price == "open" else q.close
                         eslip = self._eff_slip(q.high, q.low, q.volume, pos.qty * ex.fraction)
-                        pos = self._book(pos, px, ex.reason, ex.fraction, eslip,
+                        spread = self._spread_for(chain, xdt, pos.strike)
+                        pos = self._book(pos, px, ex.reason, ex.fraction, eslip, spread,
                                          day, entry_dt, xdt.to_pydatetime(), trades)
                 elif ex.kind == "level":             # single premium stop/target, intrabar, partial-aware
                     for xdt, o, h, l, v in self._opt_window(chain, b, b + self._tf, pos.strike, pos.side):
                         fill, hit = resolve_level_exit(ex, o, h, l)
                         if hit:
                             eslip = self._eff_slip(h, l, v, pos.qty * ex.fraction)
-                            pos = self._book(pos, fill, ex.reason, ex.fraction, eslip,
+                            spread = self._spread_for(chain, xdt, pos.strike)
+                            pos = self._book(pos, fill, ex.reason, ex.fraction, eslip, spread,
                                              day, entry_dt, xdt.to_pydatetime(), trades)
                             break
                 elif ex.kind == "spot_level":        # spot-level exit, crossing found on 1-min SPOT
@@ -230,7 +235,8 @@ class Backtest:
                         q = self._opt_quote(chain, xdt, pos.strike, pos.side)
                         if q is not None:
                             eslip = self._eff_slip(q.high, q.low, q.volume, pos.qty * ex.fraction)
-                            pos = self._book(pos, q.open, ex.reason, ex.fraction, eslip,
+                            spread = self._spread_for(chain, xdt, pos.strike)
+                            pos = self._book(pos, q.open, ex.reason, ex.fraction, eslip, spread,
                                              day, entry_dt, xdt.to_pydatetime(), trades)
                         break                        # quote missing -> re-arms next strategy bar
                 elif ex.kind == "bracket":           # premium stop/target, intrabar on option bars
@@ -240,7 +246,8 @@ class Backtest:
                         if fill is None:
                             continue
                         eslip = self._eff_slip(h, l, v, pos.qty * frac)
-                        pos = self._book(pos, fill, reason, frac, eslip,
+                        spread = self._spread_for(chain, xdt, pos.strike)
+                        pos = self._book(pos, fill, reason, frac, eslip, spread,
                                          day, entry_dt, xdt.to_pydatetime(), trades)
                         if pos is None:
                             break
@@ -255,7 +262,8 @@ class Backtest:
                         if armed and l <= stop:
                             fill = o if o < stop else stop    # gap-through -> worse open
                             eslip = self._eff_slip(h, l, v, pos.qty * ex.fraction)
-                            pos = self._book(pos, fill, ex.reason, ex.fraction, eslip,
+                            spread = self._spread_for(chain, xdt, pos.strike)
+                            pos = self._book(pos, fill, ex.reason, ex.fraction, eslip, spread,
                                              day, entry_dt, xdt.to_pydatetime(), trades)
                             break
                         peak = max(peak, h)          # pessimistic: high folds in only after the low check
@@ -270,7 +278,8 @@ class Backtest:
                             if fill is None:
                                 continue
                             eslip = self._eff_slip(h, l, v, pos.qty * frac)
-                            pos = self._book(pos, fill, reason, frac, eslip,
+                            spread = self._spread_for(chain, xdt, pos.strike)
+                            pos = self._book(pos, fill, reason, frac, eslip, spread,
                                              day, entry_dt, xdt.to_pydatetime(), trades)
                             if pos is None:
                                 break
@@ -286,7 +295,8 @@ class Backtest:
                         if l <= stop:
                             fill = o if o < stop else stop
                             eslip = self._eff_slip(h, l, v, pos.qty)
-                            pos = self._book(pos, fill, ex.trail_reason, 1.0, eslip,
+                            spread = self._spread_for(chain, xdt, pos.strike)
+                            pos = self._book(pos, fill, ex.trail_reason, 1.0, eslip, spread,
                                              day, entry_dt, xdt.to_pydatetime(), trades)
                             break
                         peak = max(peak, h)
@@ -303,7 +313,10 @@ class Backtest:
             q = self._opt_quote(chain, last, pos.strike, pos.side)
             if q is not None:
                 eslip = self._eff_slip(q.high, q.low, q.volume, pos.qty)
-                t = pos.close(q.close * (1 - eslip) - self._k.spread_rs, self._costs, reason="eod")
+                eod_spread = self._spread_for(chain, last, pos.strike)
+                eod_px = q.close * (1 - eslip) - eod_spread
+                extra_cost = self._itm_exercise_extra(day, expiry, pos, q.close, spot)
+                t = pos.close(eod_px, self._costs, reason="eod", extra_cost=extra_cost)
                 trades.append(replace(t, date=day, entry_dt=entry_dt,
                                       exit_dt=pd.Timestamp(last).to_pydatetime()))
         result.trades.extend(trades)
@@ -380,10 +393,42 @@ class Backtest:
             s *= self._k.thin_exit_mult
         return s
 
-    def _book(self, pos, fill_price, reason, fraction, slip, day, entry_dt, exit_dt, trades):
+    def _spread_for(self, chain: Chain, dt, strike: int) -> float:
+        if not self._k.spread_otm_tiers:
+            return self._k.spread_rs
+        fwd = chain.snapshot_at(pd.Timestamp(dt)).forward
+        if fwd is None:
+            return self._k.spread_rs
+        otm = abs(strike - fwd)
+        for threshold, amt in sorted(self._k.spread_otm_tiers, key=lambda x: x[0]):
+            if otm <= threshold:
+                return amt
+        return self._k.spread_rs
+
+    def _itm_exercise_extra(self, day, expiry, pos, exit_px: float, spot) -> float:
+        """Extra STT when an ITM long option is held to expiry and cash-settled.
+        Exercise STT = 0.15% of intrinsic value (settlement value per unit × qty).
+        Returns the incremental cost above what CostModel.total already charged."""
+        if day != expiry:
+            return 0.0
+        day_end = pd.Timestamp(datetime(day.year, day.month, day.day, 15, 30))
+        spot_px = spot.price_at(day_end)
+        if spot_px is None:
+            return 0.0
+        if pos.side.upper() == "CALL":
+            intrinsic = max(spot_px - pos.strike, 0.0)
+        else:
+            intrinsic = max(pos.strike - spot_px, 0.0)
+        if intrinsic <= 0.0:
+            return 0.0
+        exercise_stt = self._costs.exercise_stt(intrinsic * pos.qty)
+        normal_stt = self._costs.stt_sell * exit_px * pos.qty
+        return exercise_stt - normal_stt
+
+    def _book(self, pos, fill_price, reason, fraction, slip, spread, day, entry_dt, exit_dt, trades):
         """Close ``fraction`` of pos at fill_price; return the remaining Position
         (or None if fully closed). Enables partial scale-outs."""
-        net_px = fill_price * (1 - slip) - self._k.spread_rs
+        net_px = fill_price * (1 - slip) - spread
         if fraction >= 1.0:
             t = pos.close(net_px, self._costs, reason=reason)
             trades.append(replace(t, date=day, entry_dt=entry_dt, exit_dt=exit_dt))

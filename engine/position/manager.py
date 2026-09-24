@@ -87,16 +87,19 @@ class Position:
     qty: int
 
     def close(self, exit: float, cost_model: CostModel, n_orders: int = 2,
-              reason: str = "", qty: float = None) -> Trade:
+              reason: str = "", qty: float = None, extra_cost: float = 0.0) -> Trade:
         """Close ``qty`` units (default the full position) -> a costed Trade.
-        Partial closes pass a smaller qty; the caller keeps the remainder."""
+        Partial closes pass a smaller qty; the caller keeps the remainder.
+        ``extra_cost`` adds a pre-computed charge (e.g. ITM exercise STT) on top
+        of the statutory model — used when the normal sell-side STT is replaced by
+        a settlement-value-based charge at expiry."""
         q = self.qty if qty is None else qty
         gross = (exit - self.entry) * q
         cost = cost_model.total(
             buy_value=self.entry * q,
             sell_value=exit * q,
             n_orders=n_orders,
-        )
+        ) + extra_cost
         return Trade(
             side=self.side, strike=self.strike, qty=q,
             entry=self.entry, exit=exit,

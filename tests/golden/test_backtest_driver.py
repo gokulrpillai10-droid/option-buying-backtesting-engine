@@ -764,3 +764,49 @@ def test_rejected_order_leaves_entered_false():
                   CostModel()).run(strat, d1, d1)
     assert len(res.trades) == 0
     assert strat._entered is False   # on_fill was NOT called; _entered must stay False
+
+
+def test_fill_bar_open_determines_entry_not_signal_bar():
+    """Fill is at B+timeframe open. Changing only the fill-bar open changes P&L;
+    proves no lookahead: the signal bar price is irrelevant to the fill price."""
+    d1 = date(2024, 1, 2)
+    spot = _spot_5min([d1])
+
+    def make_chain(fill_open):
+        rows = [
+            make_row(datetime(2024, 1, 2, 9, 20), 20000, call_open=fill_open, call_close=fill_open),
+            make_row(datetime(2024, 1, 2, 9, 25), 20000, call_open=200.0, call_close=200.0),
+        ]
+        return Chain(pd.DataFrame(rows, columns=CHAIN_COLUMNS))
+
+    res_100 = Backtest(FakeMarket(spot, [(date(2024, 1, 11), {d1: make_chain(100.0)})]),
+                       CostModel()).run(BuyFirstBarHold(), d1, d1)
+    res_150 = Backtest(FakeMarket(spot, [(date(2024, 1, 11), {d1: make_chain(150.0)})]),
+                       CostModel()).run(BuyFirstBarHold(), d1, d1)
+
+    assert res_100.trades[0].entry == pytest.approx(100.0), "fill must use fill-bar open"
+    assert res_150.trades[0].entry == pytest.approx(150.0), "fill must use fill-bar open"
+    assert res_100.net() != pytest.approx(res_150.net()), "different fill → different P&L"
+
+
+def test_doubled_cost_reduces_net_pnl():
+    """Doubling all cost rates reduces net P&L. Proves the cost model is wired into
+    every trade and scales as expected."""
+    d1 = date(2024, 1, 2)
+    spot = _spot_5min([d1])
+    base_cost = CostModel()
+    double_cost = CostModel(
+        brokerage_per_order=base_cost.brokerage_per_order * 2,
+        stt_sell=base_cost.stt_sell * 2,
+        exchange=base_cost.exchange * 2,
+        sebi=base_cost.sebi * 2,
+        stamp_buy=base_cost.stamp_buy * 2,
+    )
+
+    res_base = Backtest(FakeMarket(spot, [(date(2024, 1, 11), {d1: _day_chain(d1, 100, 120)})]),
+                        base_cost).run(BuyFirstBarHold(), d1, d1)
+    res_2x   = Backtest(FakeMarket(spot, [(date(2024, 1, 11), {d1: _day_chain(d1, 100, 120)})]),
+                        double_cost).run(BuyFirstBarHold(), d1, d1)
+
+    assert res_2x.trades[0].cost > res_base.trades[0].cost, "2x cost rates → higher cost"
+    assert res_2x.trades[0].net  < res_base.trades[0].net,  "2x cost rates → lower net P&L"
