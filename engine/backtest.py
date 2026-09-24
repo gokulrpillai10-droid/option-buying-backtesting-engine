@@ -40,7 +40,7 @@ class Knobs:
     Run a strategy under both extremes and read the spread as the error band —
     a GO verdict should survive 'pessimistic'.
 
-    ``spread_rs`` models the bid-ask spread as a fixed ₹ amount per fill:
+    ``spread_rs`` models the full bid-ask spread as a fixed ₹ amount per fill:
     added to the entry price (buy at ask) and subtracted from the exit price
     (sell at bid).  Use with ``intrabar='pessimistic'`` for a full friction scenario.
     Conservative calibration estimates (pending live-fill audit):
@@ -58,7 +58,7 @@ class Knobs:
     # state-dependent friction (0/1 = off = flat slippage_pct, the historical behavior):
     slippage_range_k: float = 0.0  # extra slip = k * (fill-bar high-low)/mid — fast markets pay more
     thin_exit_mult: float = 1.0    # multiply slip when EXIT-bar volume < min_volume_mult * qty
-    spread_rs: float = 0.0         # fixed ₹ half-spread per fill side (buy pays +, sell receives -)
+    spread_rs: float = 0.0         # fixed ₹ spread per fill (buy pays +, sell receives -)
 
 
 @dataclass

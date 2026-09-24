@@ -18,6 +18,7 @@ the weekly lot changed, so it can be off by up to a week right at a boundary. Us
 """
 from __future__ import annotations
 
+import warnings
 from datetime import date
 from typing import Dict, List, Optional, Tuple
 
@@ -79,23 +80,22 @@ class LotTable:
         This catches the 2025-01-30 data entry error (lot=25 surrounded by
         lot=75 entries) without incorrectly flagging genuine regime transitions
         (where neighbors disagree by factor 3, e.g. 25→75 boundary)."""
-        import warnings
         sorted_exp = sorted(by_expiry)
         result = dict(by_expiry)
         n = len(sorted_exp)
         for i in range(1, n - 1):
             prev = by_expiry[sorted_exp[i - 1]]
             cur = by_expiry[sorted_exp[i]]
-            nxt = by_expiry[sorted_exp[i + 1]]
+            next_lot = by_expiry[sorted_exp[i + 1]]
             # neighbors agree: neither is 3x the other (no genuine regime shift between them)
-            if max(prev, nxt) >= 3 * min(prev, nxt):
+            if max(prev, next_lot) >= 3 * min(prev, next_lot):
                 continue
             # current differs from both neighbors by >= 3x
             if (max(cur, prev) >= 3 * min(cur, prev)
-                    and max(cur, nxt) >= 3 * min(cur, nxt)):
+                    and max(cur, next_lot) >= 3 * min(cur, next_lot)):
                 warnings.warn(
                     f"LotTable: isolated lot-size anomaly at {sorted_exp[i]}: "
-                    f"lot={cur} (prev={prev}, next={nxt}). Correcting to {prev}.",
+                    f"lot={cur} (prev={prev}, next={next_lot}). Correcting to {prev}.",
                     stacklevel=4,
                 )
                 result[sorted_exp[i]] = prev
