@@ -1,6 +1,6 @@
 EDGE VERDICT [fib_retracement]:  NO-GO
-  trades 554  net Rs-1,399  PF 1.00  win 37%  t-stat -0.01
-  Sharpe(trade-day,ann) -0.00  maxDD Rs-297,944  bootstrap p(net<=0) 0.495
-  split-half early Rs15,632 / late Rs-17,031  years +4/7  net-excl-top5 Rs-91,654
-  by year: 2020 Rs76,840 +  2021 Rs-87,158 -  2022 Rs-37,900 -  2023 Rs-74,765 -  2024 Rs10,355 +  2025 Rs38,027 +  2026 Rs73,203 +
-  failed gates: net Rs-1,399 <= 0
+  trades 271  net Rs-211,028  PF 0.83  win 34%  t-stat -1.41
+  Sharpe(trade-day,ann) -0.57  maxDD Rs-308,347  bootstrap p(net<=0) 0.925
+  split-half early Rs-123,678 / late Rs-87,351  years +3/7  net-excl-top5 Rs-300,817
+  by year: 2020 Rs-137 -  2021 Rs-92,747 -  2022 Rs-96,856 -  2023 Rs819 +  2024 Rs-31,571 -  2025 Rs2,067 +  2026 Rs7,397 +
+  failed gates: net Rs-211,028 <= 0

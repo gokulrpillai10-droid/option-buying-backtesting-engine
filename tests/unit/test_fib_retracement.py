@@ -67,6 +67,33 @@ def test_no_entry_before_formation_window():
             assert o == []
 
 
+def test_down_impulse_day_no_trade_ce_only():
+    # CE-only: a down-impulse (high earliest, low latest) that retraces up into the
+    # zone and breaks back below 38.2% must NOT fire a PUT — the strategy trades
+    # long-continuation up-legs only.
+    down = [
+        (9, 15, 20100, 20100, 20090, 20095),   # session HIGH (earliest)
+        (9, 20, 20095, 20096, 20040, 20045),
+        (9, 25, 20045, 20046, 20000, 20005),
+        (9, 30, 20005, 20006, 19960, 19965),
+        (9, 35, 19965, 19966, 19940, 19945),
+        (9, 40, 19945, 19946, 19920, 19925),
+        (9, 45, 19925, 19926, 19910, 19915),
+        (9, 50, 19915, 19916, 19905, 19908),
+        (9, 55, 19908, 19909, 19900, 19902),   # session LOW (latest -> down-impulse)
+        (10, 0, 19902, 20015, 19902, 20010),   # retrace up into zone [20000, 20023.6]
+        (10, 5, 20010, 20012, 19965, 19970),   # break below 38.2% (19976.4) -> would fire PUT
+    ]
+    rows = [(datetime(*DAY, hh, mm), o, h, l, c) for (hh, mm, o, h, l, c) in down]
+    spot = SpotSeries(pd.DataFrame(rows, columns=["DateTime", "Open", "High", "Low", "Close"]))
+    chain = _chain()
+    s = FibRetracement()
+    s.on_day_start(BarContext(now=datetime(*DAY, 9, 15), chain=chain, spot=spot))
+    got = [s.on_bar(BarContext(now=datetime(*DAY, hh, mm), chain=chain, spot=spot))
+           for (hh, mm, *_r) in down]
+    assert all(o == [] for o in got)               # no PUT, no trade at all
+
+
 def test_small_impulse_day_stands_aside():
     # a flat morning (range < 0.3% of spot) must produce no trade even with a wiggle
     flat = [(9, 15 + 5 * i, 20000, 20010, 19995, 20005) for i in range(9)]
