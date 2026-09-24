@@ -67,9 +67,11 @@ class FibRetracement(Strategy):
         if zone_lo <= px <= zone_hi:
             self._primed = True                           # retraced into the zone
         if self._primed and px > reclaim:                 # reclaimed 38.2% -> bounce confirmed
-            self._entered = True
             return [Order(side="CALL", strike=ctx.atm_strike("CALL"), lots=self.LOTS)]
         return []
+
+    def on_fill(self, order) -> None:
+        self._entered = True
 
     def manage(self, ctx, pos):
         return Exit.bracket(stop=pos.entry - self.STOP_PREM,

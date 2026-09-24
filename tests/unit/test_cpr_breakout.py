@@ -53,13 +53,16 @@ def test_ce_entry_on_upcross_buys_deep_itm_call():
     o = orders[0]
     assert o.side == "CALL" and o.lots == 6
     assert o.strike == _strike(20140, "CALL") == 19950                # floor(20140/50)*50 - 150
+    assert not s.entered                                               # not entered until fill confirmed
+    s.on_fill(o)                                                       # engine confirms fill
     assert s.entered and s.side == "CALL"
 
 
 def test_one_breakout_per_day():
     s, spot = CPRBreakout(), _spot()
     s.on_day_start(_ctx(spot, datetime(2024, 1, 2, 9, 15)))
-    s.on_bar(_ctx(spot, datetime(2024, 1, 2, 9, 20)))                 # first cross -> entered
+    orders = s.on_bar(_ctx(spot, datetime(2024, 1, 2, 9, 20)))        # first cross -> order returned
+    s.on_fill(orders[0])                                               # engine confirms fill -> entered
     assert s.on_bar(_ctx(spot, datetime(2024, 1, 2, 9, 20))) == []    # no second entry
 
 

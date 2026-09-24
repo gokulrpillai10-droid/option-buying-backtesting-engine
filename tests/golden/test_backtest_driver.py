@@ -613,3 +613,154 @@ def test_fill_price_close_knob_matches_g12_convention():
     res = bt.run(BuyFirstBarHold(), d1, d1)
     # entry = CallClose at 09:20 = entry_open + 5 = 105 (not the 100 open)
     assert res.trades[0].entry == 105.0
+
+
+# ---- fill lifecycle callbacks ----
+
+class SpyFillStrategy(Strategy):
+    """Records on_fill / on_order_rejected calls for assertion."""
+    def on_day_start(self, ctx):
+        self._done = False
+        self.filled = []
+        self.rejected = []
+
+    def on_bar(self, ctx):
+        if not self._done:
+            self._done = True
+            return [Order(side="CALL", strike=20000, lots=1)]
+        return []
+
+    def on_fill(self, order):
+        self.filled.append(order)
+
+    def on_order_rejected(self, order, reason):
+        self.rejected.append((order, reason))
+
+
+def _signal_only_chain(d):
+    """Chain with a signal bar at 09:15 but no fill bar at 09:20.
+    Produces a no_quote rejection because snapshot_at(09:20) is empty."""
+    rows = [make_row(datetime(d.year, d.month, d.day, 9, 15), 20000,
+                     call_open=100, call_close=100)]
+    return Chain(pd.DataFrame(rows, columns=CHAIN_COLUMNS))
+
+
+def test_on_fill_called_on_confirmed_entry():
+    d1 = date(2024, 1, 2)
+    spot = _spot_5min([d1])
+    batches = [(date(2024, 1, 11), {d1: _day_chain(d1, 100, 120)})]
+    strat = SpyFillStrategy()
+    res = Backtest(FakeMarket(spot, batches), CostModel()).run(strat, d1, d1)
+    assert len(strat.filled) == 1 and strat.filled[0].strike == 20000
+    assert strat.rejected == []
+    assert res.missed_fills == 0 and res.missed_fill_log == []
+
+
+def test_on_order_rejected_no_quote_when_fill_bar_absent():
+    # Fill bar 09:20 missing from chain -> no_quote rejection, zero trades
+    d1 = date(2024, 1, 2)
+    strat = SpyFillStrategy()
+    res = Backtest(FakeMarket(_spot_5min([d1]),
+                              [(date(2024, 1, 11), {d1: _signal_only_chain(d1)})]),
+                  CostModel()).run(strat, d1, d1)
+    assert len(res.trades) == 0
+    assert len(strat.rejected) == 1 and strat.rejected[0][1] == "no_quote"
+    assert res.missed_fills == 1
+    assert res.missed_fill_log == [{"day": d1, "reason": "no_quote",
+                                    "strike": 20000, "side": "CALL"}]
+
+
+def test_on_order_rejected_volume_when_signal_bar_too_thin():
+    d1 = date(2024, 1, 2)
+    strat = SpyFillStrategy()
+    res = Backtest(FakeMarket(_vol_spot(d1),
+                              [(date(2024, 1, 11), {d1: _vol_day_chain(d1, 1)})]),
+                  CostModel(), Knobs(min_volume_mult=10)).run(strat, d1, d1)
+    assert len(res.trades) == 0
+    assert len(strat.rejected) == 1 and strat.rejected[0][1] == "volume"
+    assert res.missed_fills == 1
+
+
+def test_missed_fills_zero_on_clean_multi_day_run():
+    d1, d2 = date(2024, 1, 2), date(2024, 1, 3)
+    spot = _spot_5min([d1, d2])
+    batches = [(date(2024, 1, 11),
+                {d1: _day_chain(d1, 100, 120), d2: _day_chain(d2, 200, 230)})]
+    res = Backtest(FakeMarket(spot, batches), CostModel()).run(BuyFirstBarHold(), d1, d2)
+    assert res.missed_fills == 0 and res.missed_fill_log == []
+
+
+def test_spread_rs_widens_entry_and_narrows_exit():
+    # spread_rs=10: entry price rises by ₹10, EOD exit price falls by ₹10.
+    # Gross without spread: (120 - 100) * qty = 1500 (qty=75).
+    # With spread: entry=110, exit=110 -> gross 0. Net with spread from both sides.
+    d1 = date(2024, 1, 2)
+    spot = _spot_5min([d1])
+    batches = [(date(2024, 1, 11), {d1: _day_chain(d1, 100, 120)})]
+
+    res_base = Backtest(FakeMarket(spot, batches), CostModel()).run(BuyFirstBarHold(), d1, d1)
+    res_slip = Backtest(FakeMarket(spot, batches), CostModel(),
+                        Knobs(spread_rs=10.0)).run(BuyFirstBarHold(), d1, d1)
+
+    qty = lot_size_for(d1)
+    assert res_base.trades[0].entry == pytest.approx(100.0)
+    assert res_slip.trades[0].entry == pytest.approx(110.0)   # entry + spread_rs
+    assert res_slip.trades[0].exit == pytest.approx(110.0)    # eod_close(120) - spread_rs(10)
+    assert res_slip.trades[0].gross == pytest.approx(0.0)     # both spreads cancel the move
+
+
+def _chain_with_15_30(d, entry_open=100.0, eod_close=120.0):
+    """Chain that has option bars through 15:30 (the NSE options close)."""
+    rows = [
+        make_row(datetime(d.year, d.month, d.day, 9, 20), 20000,
+                 call_open=entry_open, call_close=entry_open + 5),
+        make_row(datetime(d.year, d.month, d.day, 15, 25), 20000,
+                 call_open=eod_close - 3, call_close=eod_close - 2),
+        make_row(datetime(d.year, d.month, d.day, 15, 30), 20000,
+                 call_open=eod_close - 1, call_close=eod_close),
+    ]
+    return Chain(pd.DataFrame(rows, columns=CHAIN_COLUMNS))
+
+
+def test_eod_exit_uses_15_30_bar_when_present():
+    # Engine uses chain._df["DateTime"].max() for EOD; if 15:30 is the last bar,
+    # EOD exit price must be the 15:30 close.
+    d1 = date(2024, 1, 2)
+    spot = SpotSeries(pd.DataFrame(
+        [(datetime(2024, 1, 2, h, m), 100.0, 100.0, 100.0, 100.0)
+         for h, m in ((9, 15), (9, 20), (15, 25), (15, 30))],
+        columns=["DateTime", "Open", "High", "Low", "Close"]))
+    batches = [(date(2024, 1, 11), {d1: _chain_with_15_30(d1, entry_open=100.0, eod_close=130.0)})]
+    res = Backtest(FakeMarket(spot, batches), CostModel()).run(BuyFirstBarHold(), d1, d1)
+    assert len(res.trades) == 1
+    assert res.trades[0].exit == pytest.approx(130.0)         # the 15:30 close
+    assert res.trades[0].exit_dt.hour == 15
+    assert res.trades[0].exit_dt.minute == 30
+
+
+class EnteredOnFillStrategy(Strategy):
+    """Sets _entered only in on_fill — the correct pattern (vs. the pre-fix bug
+    of setting it in on_bar before the engine confirms the fill)."""
+    def on_day_start(self, ctx):
+        self._entered = False
+
+    def on_bar(self, ctx):
+        if not self._entered:
+            return [Order(side="CALL", strike=20000, lots=1)]
+        return []
+
+    def on_fill(self, order):
+        self._entered = True
+
+
+def test_rejected_order_leaves_entered_false():
+    # Fill bar 09:20 absent -> no_quote rejection -> on_fill NOT called -> _entered stays False.
+    # This is the pattern required by fib_retracement and cpr_breakout to avoid
+    # locking out re-entry after an expiry-day rejection.
+    d1 = date(2024, 1, 2)
+    strat = EnteredOnFillStrategy()
+    res = Backtest(FakeMarket(_spot_5min([d1]),
+                              [(date(2024, 1, 11), {d1: _signal_only_chain(d1)})]),
+                  CostModel()).run(strat, d1, d1)
+    assert len(res.trades) == 0
+    assert strat._entered is False   # on_fill was NOT called; _entered must stay False

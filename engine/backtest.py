@@ -39,6 +39,16 @@ class Knobs:
     PRIOR bar's peak; 'optimistic' also lets a bracket's target win the tie.
     Run a strategy under both extremes and read the spread as the error band —
     a GO verdict should survive 'pessimistic'.
+
+    ``spread_rs`` models the bid-ask spread as a fixed ₹ amount per fill:
+    added to the entry price (buy at ask) and subtracted from the exit price
+    (sell at bid).  Use with ``intrabar='pessimistic'`` for a full friction scenario.
+    Conservative calibration estimates (pending live-fill audit):
+        ATM option  ~₹8     (deep liquid; less on quiet days)
+        1-OTM       ~₹5
+        2+ OTM      ~₹2
+    Applied to single-leg fills only; spread-position legs are unaffected until
+    live calibration confirms per-leg spread sizes.
     """
     slippage_pct: float = 0.0
     timeframe: str = "5min"
@@ -48,12 +58,15 @@ class Knobs:
     # state-dependent friction (0/1 = off = flat slippage_pct, the historical behavior):
     slippage_range_k: float = 0.0  # extra slip = k * (fill-bar high-low)/mid — fast markets pay more
     thin_exit_mult: float = 1.0    # multiply slip when EXIT-bar volume < min_volume_mult * qty
+    spread_rs: float = 0.0         # fixed ₹ half-spread per fill side (buy pays +, sell receives -)
 
 
 @dataclass
 class Result:
     trades: List[Trade] = field(default_factory=list)
     carry_forwards: int = 0          # data-quality: option-price gaps carried forward
+    missed_fills: int = 0            # data-quality: orders that could not be filled
+    missed_fill_log: List[dict] = field(default_factory=list)
 
     def net(self) -> float:
         return sum(t.net for t in self.trades)
@@ -106,7 +119,7 @@ class Backtest:
         result = Result()
         for expiry, chains in self._market.stream(start, end):
             for day in sorted(chains):
-                result.trades.extend(self._run_day(strategy, expiry, day, chains[day]))
+                self._run_day(strategy, expiry, day, chains[day], result)
         return result
 
     def _lot(self, expiry, day) -> int:
@@ -120,11 +133,11 @@ class Backtest:
         return lot_size_for(day)
 
     # ---- one day ----
-    def _run_day(self, strategy, expiry, day: date, chain: Chain) -> List[Trade]:
+    def _run_day(self, strategy, expiry, day: date, chain: Chain, result: Result) -> None:
         spot = self._market.spot()
         bars = [t for t in spot.timestamps() if t.to_pydatetime().date() == day]
         if not bars:
-            return []
+            return
         slip = self._k.slippage_pct
         strategy.on_day_start(BarContext(now=bars[0].to_pydatetime(), chain=chain, spot=spot))
 
@@ -143,6 +156,15 @@ class Backtest:
                         pos = self._open_spread(orders, chain, fill_dt, expiry, day, slip)  # multi-leg
                         if pos is not None:
                             entry_dt = fill_dt.to_pydatetime()
+                            for o in orders:
+                                strategy.on_fill(o)
+                        else:
+                            for o in orders:
+                                strategy.on_order_rejected(o, "no_quote_spread")
+                            result.missed_fills += 1          # 1 per attempt, not per leg
+                            result.missed_fill_log.append(
+                                {"day": day, "reason": "no_quote_spread",
+                                 "strike": None, "side": None})
                         continue
                     q = self._opt_quote(chain, fill_dt, orders[0].strike, orders[0].side)
                     if q is not None:
@@ -150,11 +172,23 @@ class Backtest:
                         qty = orders[0].qty if orders[0].qty is not None else orders[0].lots * self._lot(expiry, day)
                         if self._volume_ok(chain, now, orders[0].strike, orders[0].side, qty):
                             eslip = self._eff_slip(q.high, q.low)   # entry qty gated by _volume_ok
-                            pos = Position(orders[0].side, orders[0].strike, px * (1 + eslip), qty)
+                            pos = Position(orders[0].side, orders[0].strike,
+                                           px * (1 + eslip) + self._k.spread_rs, qty)
                             entry_dt = fill_dt.to_pydatetime()
                             peak = px                          # premium peak starts at the raw fill
-                        # else: signal-bar volume too thin to fill the order -> skip (no re-entry,
-                        # the strategy already marked the day entered)
+                            strategy.on_fill(orders[0])
+                        else:
+                            strategy.on_order_rejected(orders[0], "volume")
+                            result.missed_fills += 1
+                            result.missed_fill_log.append(
+                                {"day": day, "reason": "volume",
+                                 "strike": orders[0].strike, "side": orders[0].side})
+                    else:
+                        strategy.on_order_rejected(orders[0], "no_quote")
+                        result.missed_fills += 1
+                        result.missed_fill_log.append(
+                            {"day": day, "reason": "no_quote",
+                             "strike": orders[0].strike, "side": orders[0].side})
             elif isinstance(pos, SpreadPosition):              # ---- spread management ----
                 ex = strategy.manage(ctx, pos)
                 if ex is not None and ex.kind == "market":
@@ -269,10 +303,10 @@ class Backtest:
             q = self._opt_quote(chain, last, pos.strike, pos.side)
             if q is not None:
                 eslip = self._eff_slip(q.high, q.low, q.volume, pos.qty)
-                t = pos.close(q.close * (1 - eslip), self._costs, reason="eod")
+                t = pos.close(q.close * (1 - eslip) - self._k.spread_rs, self._costs, reason="eod")
                 trades.append(replace(t, date=day, entry_dt=entry_dt,
                                       exit_dt=pd.Timestamp(last).to_pydatetime()))
-        return trades
+        result.trades.extend(trades)
 
     def _open_spread(self, orders, chain, fill_dt, expiry, day, slip):
         """Open a multi-leg SpreadPosition; each leg fills at fill_dt with adverse
@@ -349,12 +383,13 @@ class Backtest:
     def _book(self, pos, fill_price, reason, fraction, slip, day, entry_dt, exit_dt, trades):
         """Close ``fraction`` of pos at fill_price; return the remaining Position
         (or None if fully closed). Enables partial scale-outs."""
+        net_px = fill_price * (1 - slip) - self._k.spread_rs
         if fraction >= 1.0:
-            t = pos.close(fill_price * (1 - slip), self._costs, reason=reason)
+            t = pos.close(net_px, self._costs, reason=reason)
             trades.append(replace(t, date=day, entry_dt=entry_dt, exit_dt=exit_dt))
             return None
         close_qty = pos.qty * fraction
-        t = pos.close(fill_price * (1 - slip), self._costs, reason=reason, qty=close_qty)
+        t = pos.close(net_px, self._costs, reason=reason, qty=close_qty)
         trades.append(replace(t, date=day, entry_dt=entry_dt, exit_dt=exit_dt))
         return Position(pos.side, pos.strike, pos.entry, pos.qty - close_qty)
 

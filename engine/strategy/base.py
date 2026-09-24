@@ -92,6 +92,12 @@ class Strategy:
 
     ``on_day_start`` clears intraday state each day (the engine is intraday-only);
     ``manage`` decides exits for an open position each bar.
+
+    Fill lifecycle hooks (both default to no-op):
+    - ``on_fill(order)`` — engine confirmed the fill; set _entered here, not in on_bar.
+    - ``on_order_rejected(order, reason)`` — engine could not fill (``reason`` is
+      ``"no_quote"`` when the fill bar is absent, ``"volume"`` when the signal-bar
+      volume gate fails, ``"no_quote_spread"`` when a spread leg has no price).
     """
 
     def on_day_start(self, ctx: BarContext) -> None:
@@ -102,6 +108,12 @@ class Strategy:
 
     def manage(self, ctx: BarContext, position):
         return None
+
+    def on_fill(self, order) -> None:
+        pass
+
+    def on_order_rejected(self, order, reason: str) -> None:
+        pass
 
     def on_eod(self, ctx: BarContext) -> List:
         return []

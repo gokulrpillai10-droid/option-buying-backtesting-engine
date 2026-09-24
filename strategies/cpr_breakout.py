@@ -109,7 +109,6 @@ class CPRBreakout(Strategy):
             side = "PUT"
         if side is None:
             return []
-        self.entered = True
         self.side = side
         # the close-based CPR stop level. "none" -> unreachable (premium stop only);
         # "far" = opposite edge (original); "broken" = the edge just crossed.
@@ -120,6 +119,9 @@ class CPRBreakout(Strategy):
         else:
             self.stop_close = self.top if self.stop_mode == "far" else self.bottom
         return [Order(side=side, strike=_strike(bar.close, side), lots=self.LOTS)]
+
+    def on_fill(self, order) -> None:
+        self.entered = True
 
     def manage(self, ctx, pos):
         if ctx.now.time() >= self.SQUARE:

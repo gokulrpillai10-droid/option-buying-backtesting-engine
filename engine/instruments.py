@@ -65,7 +65,41 @@ class LotTable:
         """Build from an EXPIRIES frame with ``Expiry`` and ``LotSize`` columns."""
         sub = df[["Expiry", "LotSize"]].dropna()
         by = {_as_date(e): int(l) for e, l in zip(sub["Expiry"], sub["LotSize"])}
+        by = cls._clean_anomalies(by)
         return cls(by)
+
+    @staticmethod
+    def _clean_anomalies(by_expiry: Dict[date, int]) -> Dict[date, int]:
+        """Remove isolated lot-size spikes from raw EXPIRIES data.
+
+        A spike is an expiry whose lot differs from BOTH its immediate neighbors
+        by a factor of >= 3 while the two neighbors agree with each other
+        (their ratio is < 3). The corrected value is the neighbor value.
+
+        This catches the 2025-01-30 data entry error (lot=25 surrounded by
+        lot=75 entries) without incorrectly flagging genuine regime transitions
+        (where neighbors disagree by factor 3, e.g. 25→75 boundary)."""
+        import warnings
+        sorted_exp = sorted(by_expiry)
+        result = dict(by_expiry)
+        n = len(sorted_exp)
+        for i in range(1, n - 1):
+            prev = by_expiry[sorted_exp[i - 1]]
+            cur = by_expiry[sorted_exp[i]]
+            nxt = by_expiry[sorted_exp[i + 1]]
+            # neighbors agree: neither is 3x the other (no genuine regime shift between them)
+            if max(prev, nxt) >= 3 * min(prev, nxt):
+                continue
+            # current differs from both neighbors by >= 3x
+            if (max(cur, prev) >= 3 * min(cur, prev)
+                    and max(cur, nxt) >= 3 * min(cur, nxt)):
+                warnings.warn(
+                    f"LotTable: isolated lot-size anomaly at {sorted_exp[i]}: "
+                    f"lot={cur} (prev={prev}, next={nxt}). Correcting to {prev}.",
+                    stacklevel=4,
+                )
+                result[sorted_exp[i]] = prev
+        return result
 
     def for_expiry(self, expiry) -> Optional[int]:
         """Exact lot for ``expiry``; if that expiry is absent, the lot of the
