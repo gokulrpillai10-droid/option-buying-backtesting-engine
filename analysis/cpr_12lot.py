@@ -10,9 +10,6 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-import strategies.cpr_breakout as cb          # set LOTS before constructing the strategy
-cb.LOTS = 12
-
 from engine.data.catalog import Catalog
 from engine.data.spot import SpotSeries
 from engine.data.market import MarketData
@@ -33,7 +30,7 @@ bt = Backtest(md, CostModel(), Knobs(fill_price="open", slippage_pct=0.0025, min
 
 print("Running CPR 12-lot, book8/trail4/+50/far/IV<=0.12, vol>=10x floor ...")
 res = bt.run(CPRBreakout(book_prem=50, book_lots=8, trail_prem=12, stop_mode="far",
-                         stop_prem=None, max_iv=0.12), START, END)
+                         stop_prem=None, max_iv=0.12, lots=12), START, END)
 
 tr = pd.DataFrame([{"date": pd.Timestamp(t.date), "net": t.net, "entry": t.entry, "qty": t.qty}
                    for t in res.trades])

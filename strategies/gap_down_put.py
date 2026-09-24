@@ -20,7 +20,6 @@ from engine.strategy.exit import Exit
 
 GAP, BREAK_BUF = 20.0, 2.0
 OR_END, ENTRY_CUTOFF, SQUARE = time(9, 25), time(11, 30), time(15, 15)
-LOTS = 3
 
 
 def _put_strike(spot):
@@ -28,8 +27,13 @@ def _put_strike(spot):
 
 
 class GapDownPut(Strategy):
+    LOTS = 3
+    MIN_DTE = 3
+
     def __init__(self, stop=30.0, book1=25.0, book2=50.0, trail=20.0, scale_out=True,
-                 prem_trail=None):
+                 prem_trail=None, lots=None):
+        if lots is not None:
+            self.LOTS = lots
         self.STOP, self.BOOK1, self.BOOK2, self.TRAIL = stop, book1, book2, trail
         self.scale_out = scale_out
         self.prem_trail = prem_trail          # if set: trail the option PREMIUM by this many pts
@@ -56,7 +60,7 @@ class GapDownPut(Strategy):
             self.entry_spot = bar.close
             self.min_spot = bar.low
             self.entered = True
-            return [Order(side="PUT", strike=_put_strike(bar.close), lots=LOTS)]
+            return [Order(side="PUT", strike=_put_strike(bar.close), lots=self.LOTS)]
         return []
 
     def manage(self, ctx, pos):

@@ -44,6 +44,9 @@ def roc(bars, period):
 
 
 class ATRROCBuy(Strategy):
+    LOTS = 1
+    MIN_DTE = 3
+
     def __init__(self, atr_period=14, roc_period=12, atr_min=50.0, lots=1,
                  target=3000.0, stop=3000.0, entry_cutoff=time(14, 55), square=time(15, 0)):
         self.AP, self.RP, self.ATR_MIN = atr_period, roc_period, atr_min

@@ -62,6 +62,9 @@ def itm_strike(spot, side, offset):
 
 
 class Ema5Itm(Strategy):
+    LOTS = 1
+    MIN_DTE = 3
+
     def __init__(self, side="PUT", itm_offset=100, rr=3.0, lots=1,
                  min_warmup=5, entry_end=time(15, 0), square=time(15, 10),
                  max_trades=None, premium_tgt=None, prem_trail=None,

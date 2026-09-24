@@ -22,6 +22,9 @@ def _atm(spot):
 
 
 class ORBSpread(Strategy):
+    LOTS = 3
+    MIN_DTE = 3
+
     def __init__(self, or_end=time(9, 45), width=300, lots=3,
                  target=9000.0, stop=3000.0, entry_cutoff=time(15, 0), square=time(15, 25),
                  min_iv=None):

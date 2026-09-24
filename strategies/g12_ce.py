@@ -20,7 +20,7 @@ from engine.execution.model import Order
 from engine.strategy.base import Strategy
 from engine.strategy.exit import Exit
 
-MIN_DROP, DELTA, TRAIL_PREM, LOTS = 80.0, 0.70, 12.0, 3
+MIN_DROP, DELTA, TRAIL_PREM = 80.0, 0.70, 12.0
 EA, EB, EOD = time(10, 0), time(12, 15), time(15, 15)
 
 
@@ -35,6 +35,13 @@ def _strike(spot):
 
 
 class G12CE(Strategy):
+    LOTS = 3
+    MIN_DTE = 3
+
+    def __init__(self, lots=None):
+        if lots is not None:
+            self.LOTS = lots
+
     def on_day_start(self, ctx):
         self.locked = False
         self.swing_high = -1e18
@@ -86,7 +93,7 @@ class G12CE(Strategy):
             self.tfib = dict(self.fib)
             self.t1 = self.t2 = self.t3 = self.trailing = False
             self.peak = c
-            return [Order(side="CALL", strike=_strike(c), lots=LOTS)]
+            return [Order(side="CALL", strike=_strike(c), lots=self.LOTS)]
         return []
 
     # ---- EXIT (in trade), spot-driven ----

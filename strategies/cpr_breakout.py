@@ -32,7 +32,6 @@ from engine.execution.model import Order
 from engine.strategy.base import Strategy
 from engine.strategy.exit import Exit, TwoStage
 
-LOTS = 6
 ITM_DEPTH = 150          # deep-ITM (~delta 0.8)
 
 
@@ -42,11 +41,16 @@ def _strike(spot, side):
 
 
 class CPRBreakout(Strategy):
+    LOTS = 6
+    MIN_DTE = 3
+
     def __init__(self, book_prem=50.0, book_lots=4, trail_prem=12.0,
                  stop_mode="far", stop_prem=None, max_cpr_ratio=None, max_iv=0.12,
-                 entry_cutoff=time(14, 45), square=time(15, 15)):
-        self.BOOK_PREM = book_prem                 # premium-points gain to scale out at
-        self.BOOK_FRAC = book_lots / LOTS          # 2/6 -> book 1/3, carry 4
+                 entry_cutoff=time(14, 45), square=time(15, 15), lots=None):
+        if lots is not None:
+            self.LOTS = lots
+        self.BOOK_PREM = book_prem
+        self.BOOK_FRAC = book_lots / self.LOTS
         self.TRAIL_PREM = trail_prem
         self.stop_mode = stop_mode                 # "far" (original) or "broken" (tighter) CPR-close stop
         self.STOP_PREM = stop_prem                 # optional premium loss-cap (None = off)
@@ -115,7 +119,7 @@ class CPRBreakout(Strategy):
             self.stop_close = self.bottom if self.stop_mode == "far" else self.top
         else:
             self.stop_close = self.top if self.stop_mode == "far" else self.bottom
-        return [Order(side=side, strike=_strike(bar.close, side), lots=LOTS)]
+        return [Order(side=side, strike=_strike(bar.close, side), lots=self.LOTS)]
 
     def manage(self, ctx, pos):
         if ctx.now.time() >= self.SQUARE:

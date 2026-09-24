@@ -20,6 +20,9 @@ A9, A21 = 2 / (9 + 1), 2 / (21 + 1)
 
 
 class EMACrossover(Strategy):
+    LOTS = 1
+    MIN_DTE = 3
+
     def __init__(self, pnl_exit=2000.0, exit_points=None,
                  stop_points=None, target_points=None, itm_offset=0, lots=1, max_trades=None,
                  use_vwap=False,

@@ -16,7 +16,6 @@ from engine.strategy.base import Strategy
 from engine.strategy.exit import Exit, TwoStage
 from strategies import gap_fill_params as P
 
-LOTS = 6
 RECORD = time(9, 15)        # stash settled open / day open (both arms)
 DECIDE_F = time(9, 15)      # fade decides at 09:15 (fills next bar ~09:20)
 DECIDE_R = time(9, 30)      # reversal decides at 09:30
@@ -32,10 +31,18 @@ def _atm(snap, ref, side):
 
 
 class GapFillFade(Strategy):
-    def __init__(self, arm="fade", lots=LOTS):
+    LOTS = 6
+    MIN_DTE = 3
+
+    def __init__(self, arm="fade", lots=None, floor=P.FLOOR, cap=P.CAP):
         assert arm in ("fade", "reversal")
         self.arm = arm
-        self.lots = lots
+        if lots is not None:
+            self.LOTS = lots
+        # gap band; defaults are the frozen params. Overridable ONLY so the run
+        # driver can trade below-FLOOR / above-CAP gaps for diagnostic buckets.
+        self.floor = floor
+        self.cap = cap
         # book 4/6 at +BOOK, trail 2/6 by TRAIL, full premium stop at -STOP
         self._two = TwoStage(P.BOOK, P.TRAIL, 4 / 6, stop_pts=P.STOP)
 
@@ -59,7 +66,7 @@ class GapFillFade(Strategy):
         if self.pc is None or self.settled is None:
             return None
         gap = self.settled / self.pc - 1.0
-        if not (P.FLOOR <= abs(gap) <= P.CAP):
+        if not (self.floor <= abs(gap) <= self.cap):
             return None
         if self.arm == "fade":
             side = "PUT" if gap > 0 else "CALL"
@@ -88,7 +95,7 @@ class GapFillFade(Strategy):
             return []
         side, strike = sel
         self.entered = True
-        return [Order(side=side, strike=strike, lots=self.lots)]
+        return [Order(side=side, strike=strike, lots=self.LOTS)]
 
     def manage(self, ctx, pos):
         if ctx.now.time() >= SQUARE:
