@@ -8,8 +8,10 @@ from datetime import date, datetime
 
 import pandas as pd
 
+import pytest
+
 from engine.data.spot import SpotSeries
-from engine.data.market import MarketData
+from engine.data.market import MarketData, DataFreshnessError
 
 
 class FakeCatalog:
@@ -60,6 +62,46 @@ def test_quarantined_days_are_skipped_and_counted():
         [date(2024, 1, 1), date(2024, 1, 5), date(2024, 1, 10)]
     assert md.quarantined_between(date(2024, 1, 1), date(2024, 1, 10)) == 1
     assert md.quarantined_between(date(2024, 1, 3), date(2024, 1, 10)) == 0
+
+
+def test_last_expiry_date_returns_max():
+    cat = FakeCatalog(["2024-01-04", "2024-01-11", "2024-01-18"])
+    md = MarketData(cat, _spot([date(2024, 1, 1)]))
+    assert md.last_expiry_date() == date(2024, 1, 18)
+
+
+def test_last_expiry_date_none_when_empty():
+    cat = FakeCatalog([])
+    md = MarketData(cat, _spot([date(2024, 1, 1)]))
+    assert md.last_expiry_date() is None
+
+
+def test_stream_raises_when_end_past_last_expiry():
+    cat = FakeCatalog(["2024-01-04", "2024-01-11"])
+    md = MarketData(cat, _spot([date(2024, 1, 1), date(2024, 1, 2)]))
+    with pytest.raises(DataFreshnessError, match="2024-01-15"):
+        list(md.stream(date(2024, 1, 1), date(2024, 1, 15)))
+
+
+def test_stream_ok_when_end_equals_last_expiry():
+    cat = FakeCatalog(["2024-01-11"])
+    md = MarketData(cat, _spot([date(2024, 1, 1)]))
+    result = list(md.stream(date(2024, 1, 1), date(2024, 1, 11)))
+    assert isinstance(result, list)
+
+
+def test_stream_ok_when_end_before_last_expiry():
+    cat = FakeCatalog(["2024-01-11"])
+    md = MarketData(cat, _spot([date(2024, 1, 1)]))
+    result = list(md.stream(date(2024, 1, 1), date(2024, 1, 5)))
+    assert isinstance(result, list)
+
+
+def test_stream_no_raise_when_catalog_empty():
+    cat = FakeCatalog([])
+    md = MarketData(cat, _spot([date(2024, 1, 1)]))
+    result = list(md.stream(date(2024, 1, 1), date(2024, 1, 5)))
+    assert result == []
 
 
 def test_load_quarantine_roundtrip(tmp_path):

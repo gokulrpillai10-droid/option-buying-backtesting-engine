@@ -20,6 +20,10 @@ from engine.data.spot import SpotSeries
 from engine.instruments import lot_size_for
 
 
+class DataFreshnessError(ValueError):
+    pass
+
+
 def load_quarantine(path: str) -> set:
     """The quarantined-day set written by analysis/data_integrity.py."""
     with open(path) as f:
@@ -71,10 +75,20 @@ class MarketData:
     def spot(self) -> SpotSeries:
         return self._spot
 
+    def last_expiry_date(self) -> Optional[date]:
+        return self._expiries[-1] if self._expiries else None
+
     def stream(self, start: date, end: date) -> Iterator[Tuple[date, dict]]:
         """Yield (expiry, {day: Chain}) batches over [start, end], loading each
         expiry parquet EXACTLY ONCE (ARCH-4). Days are grouped by their chosen
         expiry; an expiry with no path on disk is skipped."""
+        last = self.last_expiry_date()
+        if last is not None and end > last:
+            raise DataFreshnessError(
+                f"backtest end {end} is past the last available expiry {last} "
+                f"({(end - last).days} days of missing chain data). "
+                f"Refresh the data or set end <= {last}."
+            )
         by_exp: dict = {}
         for d in self.trading_days(start, end):
             e = self.expiry_for(d)
