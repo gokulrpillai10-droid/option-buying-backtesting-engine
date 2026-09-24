@@ -53,6 +53,17 @@ def test_fade_skips_above_cap():
     assert _fade_select(24000 * (1 + p.CAP + 0.001), 24000) is None
 
 
+def test_floor_cap_override_trades_a_below_floor_gap():
+    # diagnostic override: with floor=0 a below-FLOOR gap that the default skips
+    # is now selectable (used only by the run driver's below-FLOOR buckets).
+    s = GapFillFade(arm="fade", floor=0.0, cap=1.0)
+    s.on_day_start(None)
+    ctx = FakeCtx(datetime(2024, 6, 3, 9, 15),
+                  24000 * (1 + p.FLOOR / 2), 24000 * (1 + p.FLOOR / 2), 24000)
+    s._record_open(ctx)
+    assert s._select(ctx) is not None                # default would return None
+
+
 def test_fade_gap_up_selects_put():
     side, _ = _fade_select(24000 * (1 + (p.FLOOR + p.CAP) / 2), 24000)
     assert side == "PUT"
