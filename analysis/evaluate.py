@@ -50,7 +50,7 @@ class Verdict:
         m = self.metrics
         pf = "inf" if m["profit_factor"] == float("inf") else f"{m['profit_factor']:.2f}"
 
-        calmar_str = f"{m['calmar']:.2f}" if m.get("calmar") is not None else "n/a"
+        calmar_str = f"{m['calmar']:.2f}"
         lines = [
             f"EDGE VERDICT [{self.name}]:  {self.verdict}",
             f"  trades {int(m['n_trades'])}  net Rs{m['net']:,.0f}  PF {pf}  "
@@ -67,7 +67,7 @@ class Verdict:
         # CAGR / total return (only when capital was provided)
         if m.get("cagr") is not None:
             lines.append(
-                f"  CAGR {m['cagr']:.1%}  total return {m['total_return_pct']:.1%}  "
+                f"  CAGR {m['cagr']:.1%}  Rs{m['net']:,.0f} / {m['total_return_pct']:.1%}  "
                 f"(capital Rs{m['capital']:,.0f})"
             )
 
@@ -111,10 +111,6 @@ def _by_day_dated(trades) -> List[Tuple[object, float]]:
     return [(d, acc[d]) for d in sorted(acc)]
 
 
-def _by_day(trades) -> List[float]:
-    """Per-calendar-day net, ordered by date."""
-    return [x for _, x in _by_day_dated(trades)]
-
 
 def _t_stat(nets: List[float]) -> float:
     n = len(nets)
@@ -140,19 +136,16 @@ def _sharpe(daily: List[float], years: float) -> float:
 
 
 def _sortino(daily: List[float], years: float) -> float:
-    """Sortino ratio: mean / std-of-negative-days * sqrt(annualization).
-    Uses std of negative trading days as the downside denominator, matching
-    the convention in cpr_tearsheet.py."""
+    """Downside deviation is centered on zero (target return = 0), matching cpr_tearsheet.py."""
     n = len(daily)
     if n < 2:
         return 0.0
     mean = sum(daily) / n
     neg = [x for x in daily if x < 0]
-    if len(neg) < 2:
+    if not neg:
         return 0.0
     n_neg = len(neg)
-    mean_neg = sum(neg) / n_neg
-    var_neg = sum((x - mean_neg) ** 2 for x in neg) / (n_neg - 1)
+    var_neg = sum(x ** 2 for x in neg) / n_neg
     dn = math.sqrt(var_neg)
     if dn == 0:
         return 0.0
@@ -226,14 +219,13 @@ def _quantile(sorted_data: List[float], q: float) -> float:
     return sorted_data[lo] * (1 - frac) + sorted_data[hi] * frac
 
 
-def _var_cvar(daily: List[float], conf: float = 0.95) -> Tuple[float, float]:
-    """Historical-simulation VaR and CVaR at the given confidence level.
-    Returns (var, cvar) as raw quantile values — negative means a daily loss."""
-    if len(daily) < 2:
+def _var_cvar(data: List[float], conf: float = 0.95) -> Tuple[float, float]:
+    """Returns (var, cvar) as raw quantile values — negative means a loss."""
+    if len(data) < 2:
         return 0.0, 0.0
-    sd = sorted(daily)
-    var = _quantile(sd, 1 - conf)
-    tail = [x for x in sd if x <= var]
+    sorted_data = sorted(data)
+    var = _quantile(sorted_data, 1 - conf)
+    tail = [x for x in sorted_data if x <= var]
     cvar = sum(tail) / len(tail) if tail else var
     return var, cvar
 
@@ -256,15 +248,7 @@ def _bootstrap_p(nets: List[float]) -> float:
 def evaluate(result, name: str = "strategy", gross: Optional[float] = None,
              capital: Optional[float] = None,
              min_trades: int = MIN_TRADES) -> Verdict:
-    """Run the full edge battery on ``result`` and classify GO / MARGINAL / NO-GO.
-
-    Args:
-        result:     backtest Result with a ``.trades`` iterable.
-        name:       label for the report header.
-        gross:      gross P&L (before costs) — used to compute cost_frac if provided.
-        capital:    starting capital in Rs — enables CAGR and total_return_pct.
-        min_trades: override the minimum-sample gate (default MIN_TRADES).
-    """
+    """Run the full edge battery on ``result`` and classify GO / MARGINAL / NO-GO."""
     trades = list(getattr(result, "trades", []))
     n = len(trades)
     nets = [float(t.net) for t in trades]
@@ -281,7 +265,7 @@ def evaluate(result, name: str = "strategy", gross: Optional[float] = None,
     years_span = 1.0
     if dates:
         span_days = (max(dates) - min(dates)).days
-        years_span = max(span_days / 365.25, 1.0 / 12)
+        years_span = max(span_days / 365.25, 1.0 / 12)  # >= ~1 month
 
     by_year: Dict[int, float] = {}
     for t in trades:
@@ -307,11 +291,11 @@ def evaluate(result, name: str = "strategy", gross: Optional[float] = None,
     # --- risk ratios ---
     sharpe = _sharpe(daily, years_span)
     sortino = _sortino(daily, years_span)
-    calmar = ((net / years_span) / abs(mdd)) if mdd < 0 else None
+    calmar = ((net / years_span) / abs(mdd)) if mdd < 0 else float("inf")
 
     # --- VaR / CVaR (95% and 99%) ---
-    var_95, cvar_95 = _var_cvar(daily, 0.95)
-    var_99, cvar_99 = _var_cvar(daily, 0.99)
+    var_95, cvar_95 = _var_cvar(nets, 0.95)
+    var_99, cvar_99 = _var_cvar(nets, 0.99)
 
     # --- CAGR / total return (requires capital) ---
     cagr = total_return_pct = None
@@ -321,7 +305,11 @@ def evaluate(result, name: str = "strategy", gross: Optional[float] = None,
 
     # --- avg daily / weekly ---
     avg_daily = sum(daily) / len(daily) if daily else 0.0
-    avg_weekly = avg_daily * 5
+    by_week: Dict[Tuple, float] = {}
+    for t in trades:
+        wk = (t.date.year, t.date.isocalendar()[1])
+        by_week[wk] = by_week.get(wk, 0.0) + t.net
+    avg_weekly = sum(by_week.values()) / len(by_week) if by_week else 0.0
 
     # --- exit distribution ---
     exit_dist: Dict[str, float] = {}
