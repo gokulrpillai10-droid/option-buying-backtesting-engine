@@ -1,0 +1,24 @@
+/Users/gokul/Desktop/buildstrategies/engine/data/catalog.py:41: UserWarning: LotTable: isolated lot-size anomaly at 2025-01-30: lot=25 (prev=75, next=75). Correcting to 75.
+  self._lot_table = self._load_lot_table()
+Loading data ...
+
+=== CPR SIGNAL FUNNEL BY YEAR ===
+yr       cal  crosses  cross%   kept  kept%cross  IV-killed%
+------------------------------------------------------------
+2020     250      148     59%     12          8%         92%
+2021     247      150     61%     19         13%         87%
+2022     247      143     58%      7          5%         95%
+2023     245      161     66%    105         65%         35%
+2024     247      174     70%     37         21%         79%
+2025     248      171     69%     79         46%         54%
+2026      60       26     43%     26        100%          0%
+------------------------------------------------------------
+TOT     1544      973            285
+
+=== NOTES ===
+crosses  = days with a valid CPR cross (no IV filter, min_dte=3 still applies)
+kept     = days after IV<=0.12 filter (deployed config)
+IV-killed% = % of crossing days removed by the IV filter in that year
+
+If IV-killed% is high in 2024, elevated VIX is the culprit.
+If crosses itself dropped vs 2023, it's a market structure / data issue.
