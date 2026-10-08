@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>IV/RV Intraday Classifier — NIFTY 2020–2026</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d0d0d;color:#e0e0e0;font-family:'SF Mono',Menlo,monospace;font-size:13px;padding:24px}
+h1{font-size:17px;font-weight:600;color:#fff;margin-bottom:4px}
+.sub{color:#666;font-size:11px;margin-bottom:24px}
+.section{margin-bottom:28px}
+.section-title{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#555;margin-bottom:10px;border-bottom:1px solid #1e1e1e;padding-bottom:6px}
+.cards{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:28px}
+.card{background:#131313;border:1px solid #1e1e1e;border-radius:6px;padding:14px 16px}
+.card .label{font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.card .val{font-size:22px;font-weight:700;color:#fff}
+.card .val.green{color:#26c56a}
+.card .val.amber{color:#f0a500}
+.card .val.muted{color:#888}
+.card .sub2{font-size:10px;color:#444;margin-top:4px}
+.cp-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:28px}
+.cp-card{background:#131313;border:1px solid #1e1e1e;border-radius:6px;padding:16px}
+.cp-card h3{font-size:12px;color:#888;margin-bottom:12px;font-weight:500}
+.cp-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #191919}
+.cp-row:last-child{border-bottom:none}
+.cp-row .k{color:#555;font-size:11px}
+.cp-row .v{font-weight:600;font-size:12px}
+.cp-row .v.green{color:#26c56a}
+.cp-row .v.amber{color:#f0a500}
+canvas{display:block;width:100%;background:#131313;border:1px solid #1e1e1e;border-radius:6px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#131313;color:#555;font-weight:500;text-align:right;padding:7px 12px;border-bottom:1px solid #1e1e1e;font-size:10px;text-transform:uppercase;letter-spacing:.05em}
+th:first-child{text-align:left}
+td{padding:7px 12px;border-bottom:1px solid #161616;text-align:right;color:#bbb}
+td:first-child{text-align:left;color:#fff;font-weight:600}
+tr:hover td{background:#141414}
+.badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600}
+.badge.green{background:#0d2e1a;color:#26c56a}
+.badge.amber{background:#2e1f00;color:#f0a500}
+.badge.red{background:#2e0d0d;color:#e05555}
+.insight{background:#131313;border:1px solid #1e1e1e;border-left:3px solid #26c56a;border-radius:4px;padding:12px 16px;margin-bottom:10px;font-size:12px;line-height:1.6;color:#aaa}
+.insight strong{color:#e0e0e0}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+</style>
+</head>
+<body>
+
+<h1>IV / RV Intraday Classifier — NIFTY Options</h1>
+<div class="sub">Rolling 30-min RV (1-min bars) vs ATM IV · Nearest weekly expiry · 09:47–15:15 entry window · 2020–2026</div>
+
+<!-- ── STAT CARDS ── -->
+<div class="cards">
+  <div class="card"><div class="label">Trading Days</div><div class="val muted" id="c-days"></div><div class="sub2">2020-01 → 2026-02</div></div>
+  <div class="card"><div class="label">Total Bars</div><div class="val muted" id="c-bars"></div><div class="sub2">329 bars / day</div></div>
+  <div class="card"><div class="label">IV &lt; 20%</div><div class="val green" id="c-iv"></div><div class="sub2">cheap absolute</div></div>
+  <div class="card"><div class="label">IV/RV₃₀ &lt; 1.0</div><div class="val amber" id="c-ivrv"></div><div class="sub2">cheaper than RV</div></div>
+  <div class="card"><div class="label">Median IV</div><div class="val muted" id="c-med-iv"></div><div class="sub2">annualised ATM</div></div>
+  <div class="card"><div class="label">Median IV/RV₃₀</div><div class="val amber" id="c-med-ivrv"></div><div class="sub2">options always pricier</div></div>
+</div>
+
+<!-- ── CHECKPOINTS ── -->
+<div class="section">
+  <div class="section-title">Checkpoints — first valid RV reading</div>
+  <div class="cp-grid" id="cp-grid"></div>
+</div>
+
+<!-- ── KEY INSIGHTS ── -->
+<div class="section">
+  <div class="section-title">Key Findings</div>
+  <div class="insight"><strong>Best entry window is 09:47–10:00.</strong> IV/RV₃₀ &lt; 1.0 hits 25.9% of days at the 09:47 checkpoint. By 10:30 it collapses to 4.6%. If the opening 30-min RV is high (volatile open), options look cheap — that window closes fast.</div>
+  <div class="insight"><strong>IV alone is not selective.</strong> IV &lt; 20% passes 73–75% of all bars across every time bucket — it barely changes intraday. The real signal is IV/RV₃₀ which discriminates sharply by time of day.</div>
+  <div class="insight"><strong>Median IV/RV₃₀ is 1.91× overall.</strong> NIFTY options consistently price in ~91% more vol than the 30-min window delivers. Options are structurally expensive vs intraday moves — "cheap" (ratio &lt; 1.0) is genuinely rare (4.9% of bars).</div>
+</div>
+
+<!-- ── TIME-OF-DAY CHART ── -->
+<div class="section">
+  <div class="section-title">IV/RV₃₀ &lt; 1.0 by time of day (% of bars)</div>
+  <canvas id="tod-chart" height="180"></canvas>
+</div>
+
+<!-- ── MEDIAN IV/RV LINE CHART ── -->
+<div class="section two-col">
+  <div>
+    <div class="section-title">Median IV/RV₃₀ by time bucket</div>
+    <canvas id="med-chart" height="200"></canvas>
+  </div>
+  <div>
+    <div class="section-title">Monthly median IV/RV₃₀ trend (2020–2026)</div>
+    <canvas id="monthly-chart" height="200"></canvas>
+  </div>
+</div>
+
+<!-- ── YEAR TABLE ── -->
+<div class="section">
+  <div class="section-title">Year-by-year breakdown</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Year</th><th>Days</th><th>Bars</th>
+        <th>IV &lt; 20%</th><th>IV/RV₃₀ &lt; 1.0</th>
+        <th>Median IV</th><th>Median IV/RV₃₀</th>
+        <th>P10 IV/RV</th><th>P90 IV/RV</th>
+      </tr>
+    </thead>
+    <tbody id="year-tbody"></tbody>
+  </table>
+</div>
+
+<script>
+const D = {"total_bars": 498741, "total_days": 1517, "pct_iv_overall": 75.4, "pct_ivrv_overall": 4.9, "med_iv_overall": 15.1, "med_ivrv_overall": 1.91, "years": [{"year": 2020, "days": 249, "bars": 81820, "pct_iv": 38.0, "pct_ivrv": 3.1, "med_iv": 22.0, "med_ivrv": 1.96, "p10_ivrv": 1.24, "p90_ivrv": 2.96}, {"year": 2021, "days": 246, "bars": 80934, "pct_iv": 71.5, "pct_ivrv": 4.2, "med_iv": 16.9, "med_ivrv": 1.89, "p10_ivrv": 1.2, "p90_ivrv": 2.86}, {"year": 2022, "days": 245, "bars": 80605, "pct_iv": 57.5, "pct_ivrv": 2.0, "med_iv": 18.6, "med_ivrv": 2.11, "p10_ivrv": 1.33, "p90_ivrv": 3.22}, {"year": 2023, "days": 245, "bars": 80605, "pct_iv": 98.2, "pct_ivrv": 4.6, "med_iv": 11.2, "med_ivrv": 1.86, "p10_ivrv": 1.18, "p90_ivrv": 2.84}, {"year": 2024, "days": 247, "bars": 81012, "pct_iv": 92.2, "pct_ivrv": 7.2, "med_iv": 14.0, "med_ivrv": 1.9, "p10_ivrv": 1.08, "p90_ivrv": 3.15}, {"year": 2025, "days": 246, "bars": 80934, "pct_iv": 92.5, "pct_ivrv": 7.0, "med_iv": 12.3, "med_ivrv": 1.81, "p10_ivrv": 1.08, "p90_ivrv": 3.1}, {"year": 2026, "days": 39, "bars": 12831, "pct_iv": 94.7, "pct_ivrv": 11.3, "med_iv": 11.2, "med_ivrv": 1.51, "p10_ivrv": 0.98, "p90_ivrv": 2.38}], "tod": [{"time": "09:30", "pct_iv": 73.6, "pct_ivrv": 19.5, "med_ivrv": 1.33}, {"time": "10:00", "pct_iv": 74.2, "pct_ivrv": 9.4, "med_ivrv": 1.58}, {"time": "10:30", "pct_iv": 74.2, "pct_ivrv": 4.6, "med_ivrv": 1.86}, {"time": "11:00", "pct_iv": 74.5, "pct_ivrv": 2.8, "med_ivrv": 2.09}, {"time": "11:30", "pct_iv": 74.8, "pct_ivrv": 2.3, "med_ivrv": 2.19}, {"time": "12:00", "pct_iv": 74.8, "pct_ivrv": 1.7, "med_ivrv": 2.25}, {"time": "12:30", "pct_iv": 74.9, "pct_ivrv": 1.9, "med_ivrv": 2.2}, {"time": "13:00", "pct_iv": 75.2, "pct_ivrv": 2.1, "med_ivrv": 2.09}, {"time": "13:30", "pct_iv": 76.0, "pct_ivrv": 2.7, "med_ivrv": 1.96}, {"time": "14:00", "pct_iv": 76.8, "pct_ivrv": 4.0, "med_ivrv": 1.83}, {"time": "14:30", "pct_iv": 77.7, "pct_ivrv": 6.8, "med_ivrv": 1.71}, {"time": "15:00", "pct_iv": 78.9, "pct_ivrv": 12.2, "med_ivrv": 1.53}], "checkpoints": {"09:47": {"days": 1516, "pct_iv": 73.5, "pct_ivrv": 25.9, "med_iv": 15.6, "med_ivrv": 1.24}, "10:02": {"days": 1514, "pct_iv": 73.8, "pct_ivrv": 13.3, "med_iv": 15.5, "med_ivrv": 1.46}}, "monthly": [{"ym": "2020-01", "med": 2.093}, {"ym": "2020-02", "med": 1.841}, {"ym": "2020-03", "med": 1.983}, {"ym": "2020-04", "med": 2.02}, {"ym": "2020-05", "med": 2.146}, {"ym": "2020-06", "med": 1.891}, {"ym": "2020-07", "med": 2.01}, {"ym": "2020-08", "med": 2.028}, {"ym": "2020-09", "med": 1.723}, {"ym": "2020-10", "med": 1.882}, {"ym": "2020-11", "med": 1.844}, {"ym": "2020-12", "med": 2.072}, {"ym": "2021-01", "med": 1.986}, {"ym": "2021-02", "med": 1.703}, {"ym": "2021-03", "med": 1.942}, {"ym": "2021-04", "med": 1.803}, {"ym": "2021-05", "med": 2.252}, {"ym": "2021-06", "med": 2.095}, {"ym": "2021-07", "med": 1.896}, {"ym": "2021-08", "med": 1.811}, {"ym": "2021-09", "med": 1.876}, {"ym": "2021-10", "med": 1.735}, {"ym": "2021-11", "med": 1.642}, {"ym": "2021-12", "med": 1.917}, {"ym": "2022-01", "med": 1.939}, {"ym": "2022-02", "med": 1.904}, {"ym": "2022-03", "med": 2.381}, {"ym": "2022-04", "med": 1.908}, {"ym": "2022-05", "med": 1.918}, {"ym": "2022-06", "med": 2.07}, {"ym": "2022-07", "med": 2.422}, {"ym": "2022-08", "med": 2.256}, {"ym": "2022-09", "med": 2.149}, {"ym": "2022-10", "med": 2.105}, {"ym": "2022-11", "med": 2.527}, {"ym": "2022-12", "med": 1.968}, {"ym": "2023-01", "med": 1.963}, {"ym": "2023-02", "med": 1.666}, {"ym": "2023-03", "med": 1.583}, {"ym": "2023-04", "med": 1.779}, {"ym": "2023-05", "med": 1.96}, {"ym": "2023-06", "med": 2.03}, {"ym": "2023-07", "med": 1.736}, {"ym": "2023-08", "med": 1.908}, {"ym": "2023-09", "med": 1.685}, {"ym": "2023-10", "med": 1.979}, {"ym": "2023-11", "med": 2.124}, {"ym": "2023-12", "med": 2.105}, {"ym": "2024-01", "med": 1.947}, {"ym": "2024-02", "med": 1.808}, {"ym": "2024-03", "med": 1.874}, {"ym": "2024-04", "med": 1.978}, {"ym": "2024-05", "med": 1.872}, {"ym": "2024-06", "med": 1.78}, {"ym": "2024-07", "med": 1.948}, {"ym": "2024-08", "med": 2.017}, {"ym": "2024-09", "med": 2.215}, {"ym": "2024-10", "med": 1.674}, {"ym": "2024-11", "med": 1.779}, {"ym": "2024-12", "med": 1.968}, {"ym": "2025-01", "med": 1.902}, {"ym": "2025-02", "med": 1.742}, {"ym": "2025-03", "med": 1.796}, {"ym": "2025-04", "med": 1.957}, {"ym": "2025-05", "med": 2.143}, {"ym": "2025-06", "med": 2.455}, {"ym": "2025-07", "med": 1.786}, {"ym": "2025-08", "med": 1.776}, {"ym": "2025-09", "med": 1.652}, {"ym": "2025-10", "med": 1.328}, {"ym": "2025-11", "med": 1.872}, {"ym": "2025-12", "med": 1.699}, {"ym": "2026-01", "med": 1.379}, {"ym": "2026-02", "med": 1.626}]};
+
+// ── Stat cards ──
+document.getElementById('c-days').textContent = D.total_days.toLocaleString('en-IN');
+document.getElementById('c-bars').textContent = (D.total_bars/1000).toFixed(0)+'k';
+document.getElementById('c-iv').textContent = D.pct_iv_overall+'%';
+document.getElementById('c-ivrv').textContent = D.pct_ivrv_overall+'%';
+document.getElementById('c-med-iv').textContent = D.med_iv_overall+'%';
+document.getElementById('c-med-ivrv').textContent = D.med_ivrv_overall+'×';
+
+// ── Checkpoints ──
+const cpGrid = document.getElementById('cp-grid');
+Object.entries(D.checkpoints).forEach(([label, c]) => {
+  cpGrid.innerHTML += `<div class="cp-card">
+    <h3>Checkpoint ${label} &nbsp;<span style="color:#444;font-size:10px">${c.days} days</span></h3>
+    <div class="cp-row"><span class="k">IV &lt; 20%</span><span class="v green">${c.pct_iv}%</span></div>
+    <div class="cp-row"><span class="k">IV/RV₃₀ &lt; 1.0</span><span class="v amber">${c.pct_ivrv}%</span></div>
+    <div class="cp-row"><span class="k">Median IV</span><span class="v">${c.med_iv}%</span></div>
+    <div class="cp-row"><span class="k">Median IV/RV₃₀</span><span class="v">${c.med_ivrv}×</span></div>
+  </div>`;
+});
+
+// ── Canvas helpers ──
+function drawBarChart(id, labels, datasets, opts={}) {
+  const el = document.getElementById(id);
+  const dpr = window.devicePixelRatio||1;
+  el.width  = el.offsetWidth  * dpr || 800*dpr;
+  el.height = el.height * dpr;
+  const ctx = el.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = el.width/dpr, H = el.height/dpr;
+  const pad = {t:20,r:20,b:32,l:44};
+  const cW = W-pad.l-pad.r, cH = H-pad.t-pad.b;
+  const n = labels.length, nDS = datasets.length;
+  const bw = (cW/n)*0.7/nDS, gap = (cW/n)*0.3;
+  const maxV = opts.maxV || Math.max(...datasets.flatMap(d=>d.data))*1.15;
+  ctx.fillStyle='#131313'; ctx.fillRect(0,0,W,H);
+  // grid
+  for(let i=0;i<=4;i++){
+    const y = pad.t + cH - (i/4)*cH;
+    ctx.strokeStyle='#1e1e1e'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(W-pad.r,y); ctx.stroke();
+    ctx.fillStyle='#444'; ctx.font='10px SF Mono,monospace'; ctx.textAlign='right';
+    ctx.fillText((maxV*i/4).toFixed(1)+'%', pad.l-4, y+3.5);
+  }
+  // bars
+  datasets.forEach((ds,di) => {
+    ds.data.forEach((v,i) => {
+      const x = pad.l + (cW/n)*i + gap/2 + di*bw;
+      const bh = (v/maxV)*cH;
+      ctx.fillStyle = ds.color;
+      ctx.fillRect(x, pad.t+cH-bh, bw, bh);
+    });
+  });
+  // labels
+  labels.forEach((l,i) => {
+    const x = pad.l + (cW/n)*i + (cW/n)*0.5;
+    ctx.fillStyle='#555'; ctx.font='9px SF Mono,monospace'; ctx.textAlign='center';
+    ctx.fillText(l, x, H-pad.b+14);
+  });
+  // legend
+  let lx = W-pad.r;
+  datasets.slice().reverse().forEach(ds => {
+    ctx.fillStyle=ds.color; ctx.fillRect(lx-50,pad.t-10,8,8);
+    ctx.fillStyle='#666'; ctx.font='9px SF Mono,monospace'; ctx.textAlign='left';
+    ctx.fillText(ds.label, lx-40, pad.t-3); lx-=90;
+  });
+}
+
+function drawLineChart(id, labels, values, opts={}) {
+  const el = document.getElementById(id);
+  const dpr = window.devicePixelRatio||1;
+  el.width  = el.offsetWidth * dpr || 800*dpr;
+  el.height = el.height * dpr;
+  const ctx = el.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = el.width/dpr, H = el.height/dpr;
+  const pad = {t:20,r:20,b:32,l:44};
+  const cW = W-pad.l-pad.r, cH = H-pad.t-pad.b;
+  const minV = opts.minV || (Math.min(...values)*0.95);
+  const maxV = opts.maxV || (Math.max(...values)*1.05);
+  const n = values.length;
+  ctx.fillStyle='#131313'; ctx.fillRect(0,0,W,H);
+  // refline at 1.0
+  if(opts.refLine) {
+    const ry = pad.t + cH - ((opts.refLine-minV)/(maxV-minV))*cH;
+    ctx.strokeStyle='#26c56a33'; ctx.setLineDash([4,4]); ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(pad.l,ry); ctx.lineTo(W-pad.r,ry); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='#26c56a55'; ctx.font='9px SF Mono,monospace'; ctx.textAlign='left';
+    ctx.fillText('1.0×', pad.l+2, ry-3);
+  }
+  // grid
+  for(let i=0;i<=4;i++){
+    const v = minV + (maxV-minV)*(i/4);
+    const y = pad.t + cH - (i/4)*cH;
+    ctx.strokeStyle='#1e1e1e'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(W-pad.r,y); ctx.stroke();
+    ctx.fillStyle='#444'; ctx.font='10px SF Mono,monospace'; ctx.textAlign='right';
+    ctx.fillText(v.toFixed(2)+'×', pad.l-4, y+3.5);
+  }
+  // line
+  ctx.strokeStyle = opts.color || '#f0a500';
+  ctx.lineWidth = 1.5; ctx.beginPath();
+  values.forEach((v,i) => {
+    const x = pad.l + (i/(n-1))*cW;
+    const y = pad.t + cH - ((v-minV)/(maxV-minV))*cH;
+    i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+  // x labels (sparse)
+  const step = Math.ceil(n/10);
+  labels.forEach((l,i) => {
+    if(i%step!==0 && i!==n-1) return;
+    const x = pad.l + (i/(n-1))*cW;
+    ctx.fillStyle='#444'; ctx.font='9px SF Mono,monospace'; ctx.textAlign='center';
+    ctx.fillText(l, x, H-pad.b+14);
+  });
+}
+
+// ── Render charts ──
+requestAnimationFrame(() => {
+  const todLabels = D.tod.map(r=>r.time);
+  drawBarChart('tod-chart', todLabels,
+    [{label:'IV/RV₃₀<1.0', data:D.tod.map(r=>r.pct_ivrv), color:'#f0a500'},
+     {label:'IV<20%',      data:D.tod.map(r=>r.pct_iv),    color:'#26c56a33'}],
+    {maxV:100});
+
+  drawLineChart('med-chart', D.tod.map(r=>r.time), D.tod.map(r=>r.med_ivrv),
+    {refLine:1.0, minV:1.0, maxV:2.5, color:'#f0a500'});
+
+  drawLineChart('monthly-chart', D.monthly.map(r=>r.ym), D.monthly.map(r=>r.med),
+    {refLine:1.0, minV:1.0, maxV:2.8, color:'#4da6ff'});
+});
+
+// ── Year table ──
+const tbody = document.getElementById('year-tbody');
+D.years.forEach(r => {
+  const ivBadge = r.pct_iv>80?'green':r.pct_iv>50?'amber':'red';
+  const rvBadge = r.pct_ivrv>8?'green':r.pct_ivrv>4?'amber':'red';
+  tbody.innerHTML += `<tr>
+    <td>${r.year}</td>
+    <td>${r.days}</td>
+    <td>${r.bars.toLocaleString('en-IN')}</td>
+    <td><span class="badge ${ivBadge}">${r.pct_iv}%</span></td>
+    <td><span class="badge ${rvBadge}">${r.pct_ivrv}%</span></td>
+    <td>${r.med_iv}%</td>
+    <td>${r.med_ivrv}×</td>
+    <td style="color:#555">${r.p10_ivrv}×</td>
+    <td style="color:#555">${r.p90_ivrv}×</td>
+  </tr>`;
+});
+</script>
+</body>
+</html>

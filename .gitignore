@@ -7,3 +7,26 @@ data_equity/
 
 # Local secrets (daily broker tokens) — keep .env.example, ignore real .env
 .env
+
+# Data files — too large / not source code
+*.parquet
+data_spot_kite/
+
+# Generated outputs and logs
+*.log
+fyersApi.log
+fyersRequests.log
+
+# Binary / media
+*.zip
+*.docx
+*.JPG
+*.jpg
+*.pdf
+g12_ce_trades_1yr.png
+
+# Screenshots
+Screenshot*.png
+
+# Personal context files
+CONTEXT.md
