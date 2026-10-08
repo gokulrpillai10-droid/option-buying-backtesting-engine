@@ -28,9 +28,8 @@ analysis/iv_rv_intraday.parquet
            forward, strike, dte_days, call_prem, put_prem, expiry
 """
 
-import warnings, sys, datetime as _dt
+import warnings, datetime as _dt
 warnings.filterwarnings("ignore")
-sys.path.insert(0, "/Users/gokul/Desktop/buildstrategies")
 
 import numpy as np
 import pandas as pd

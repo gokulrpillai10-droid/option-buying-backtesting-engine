@@ -36,7 +36,6 @@ Output
 
 import warnings, sys, datetime as _dt
 warnings.filterwarnings("ignore")
-sys.path.insert(0, "/Users/gokul/Desktop/buildstrategies")
 
 import numpy as np
 import pandas as pd

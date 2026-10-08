@@ -1,21 +1,24 @@
 [project]
-name = "nifty-strategy-engine"
+name = "option-buying-backtesting-engine"
 version = "0.1.0"
 description = "Accurate intraday NIFTY option-buying backtest engine"
 requires-python = ">=3.9"
 dependencies = [
     "pandas>=2.0",
+    "numpy>=1.24",
     "pyarrow>=14",
+    "scipy>=1.10",
     "pyyaml>=6",
+    "python-dotenv>=1",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=7"]
-equity-fetch = ["kiteconnect>=5", "python-dotenv>=1"]   # live Kite fetch only; backtest/tests don't need them
+live = ["kiteconnect>=5", "fyers-apiv3>=3"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
 
 [tool.setuptools.packages.find]
-include = ["engine*"]
+include = ["engine*", "strategies*"]

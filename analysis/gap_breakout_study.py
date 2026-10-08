@@ -17,13 +17,14 @@ Signals:
 Run: PYTHONPATH=<repo> python3 analysis/gap_breakout_study.py [SYMBOL]
 """
 import sys
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from engine.equity.kite_loader import load_cached
 
-sys.path.insert(0, "/Users/gokul/Desktop/buildstrategies/analysis")
+sys.path.insert(0, str(Path(__file__).parent))
 from sr_core import assert_no_basis_seam  # noqa: E402
 
 SYMBOL = sys.argv[1] if len(sys.argv) > 1 else "ADANIENT"

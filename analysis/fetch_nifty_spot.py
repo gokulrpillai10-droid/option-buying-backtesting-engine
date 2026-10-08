@@ -16,12 +16,9 @@ so a crash mid-run resumes by skipping already-cached complete months.
 from __future__ import annotations
 
 import os
-import sys
 from datetime import date
 
 import pandas as pd
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from engine.equity.kite_loader import fetch_months, load_cached, make_kite
 

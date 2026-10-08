@@ -12,9 +12,8 @@ Methodology:
   - Derived       : IV/RV ratio, Theta/Premium% (daily bleed rate), Vega/Theta ratio
 """
 
-import warnings, sys, datetime as _dt
+import warnings, datetime as _dt
 warnings.filterwarnings("ignore")
-sys.path.insert(0, "/Users/gokul/Desktop/buildstrategies")
 
 import numpy as np
 import pandas as pd

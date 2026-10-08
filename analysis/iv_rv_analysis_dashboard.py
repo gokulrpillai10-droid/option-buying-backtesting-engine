@@ -1,7 +1,6 @@
 """Generates analysis/iv_rv_analysis_dashboard.html from iv_rv_intraday.parquet."""
-import json, sys, warnings, datetime as _dt
+import json, warnings, datetime as _dt
 warnings.filterwarnings("ignore")
-sys.path.insert(0, "/Users/gokul/Desktop/buildstrategies")
 
 import pandas as pd, numpy as np
 from pathlib import Path
