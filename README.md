@@ -1,6 +1,6 @@
 # option-buying-backtesting-engine
 
-Intraday NIFTY options and NSE equity backtesting engine. Built to test and validate trading strategies on real historical data — not a paper-trading simulator, not a framework with abstractions for every scenario. One purpose: find edge.
+Intraday NIFTY options and NSE equity backtesting engine. Built to test and validate trading strategies on real historical data  not a paper-trading simulator, not a framework with abstractions for every scenario. One purpose: find edge.
 
 ## What's in here
 
